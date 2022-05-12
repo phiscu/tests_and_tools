@@ -19,6 +19,7 @@ import seaborn as sns
 sys.path.append(home + '/Ana-Lena_Phillip/data/matilda/Preprocessing')
 from Downscaling.utils import prob_plots
 import warnings
+from datetime import datetime, timedelta
 
 
 ## Function to preprocess AWS-Data from SDSS
@@ -290,3 +291,13 @@ def cmip2df(temp, prec, scen, col):
     df = pd.DataFrame({'T2': temp[scen][col], 'RRR': prec[scen][col]}).reset_index()
     df.columns = ['TIMESTAMP', 'T2', 'RRR']
     return df
+
+
+##
+
+def hour_rounder(t):
+    # Rounds to nearest hour by adding a timedelta hour if minute >= 30
+    return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour)
+               + timedelta(hours=t.minute//30))
+
+# https://stackoverflow.com/questions/3463930/how-to-round-the-minute-of-a-datetime-object/10854034#10854034
