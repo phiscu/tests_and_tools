@@ -19,7 +19,7 @@ else:
     home = str(Path.home()) + '/Seafile'
 # sys.path.append(home + '/Ana-Lena_Phillip/data/matilda/MATILDA')
 # sys.path.append(home + '/Ana-Lena_Phillip/data/scripts/Test_area')
-sys.path.append(home + '/Ana-Lena_Phillip/data/matilda/Preprocessing')
+sys.path.append(home + '/Ana-Lena_Phillip/data/tests_and_tools/Preprocessing')
 from Preprocessing_functions import dmod_score, load_cmip, cmip2df
 from MATILDA_slim import MATILDA
 
@@ -59,16 +59,19 @@ glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 # plt.show()
 
 ##
-output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs,  output=output_path, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00',
+output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
                                       sim_start='1985-01-01 00:00:00', sim_end='1989-12-31 23:00:00', freq="D",
                                       area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, # soi=[5, 10],
                                       ele_dat=2550, ele_glac=4074, ele_cat=3225, lr_temp=-0.0059, lr_prec=0,
-                                      TT_snow=0.354, TT_rain=0.5815, CFMAX_snow=4, CFMAX_ice=6, CFR_snow=0.08765,
-                                      CFR_ice=0.01132, BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
-                                      LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765, AG=1000)
+                                      TT_snow=0.354, TT_rain=0.5815, CFMAX_snow=4, CFMAX_ice=6,
+                                      BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
+                                      LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
+                                      AG=0.7, RHO_snow=300)
 
 output_MATILDA[6].show()
+print(output_MATILDA[2].Q_Total)
 
+# 0.1*1000000**0.7
 ## Mit default parameters:
 
 # output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs,  output=output_path, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00',
@@ -78,20 +81,6 @@ output_MATILDA[6].show()
 #
 # output_MATILDA[6].show()
 
-# - Letzten zwei Darstellungen zeigen mit und ohne glacier-to-soil option
-# - mit der option macht gestackte darstellung eigentlich keinen sinn mehr
-# - noch einmal mit "optimiertem" parametersatz probieren ob matilda wieder vollständig ohne die option und dann auf master pushen
-# - danach option wieder einbauen und in separaten branch
-# - eigentlich müsste man beides mal mit SPOTPY optimieren und dann betrachten
-
-
-
-
-# test = df.set_index('TIMESTAMP')
-# test['RRR'][slice('1982-01-01 00:00:00','1990-12-31 23:00:00')]
-# for i in range(2100,2192):
-#     print(output_MATILDA[0]['Q_DDM_scaled'].squeeze()[i])
-# - glacier melt am Besten bei tosoil mit einfügen
 
 ## With glacier change
 
@@ -110,6 +99,7 @@ output_MATILDA[6].show()
 # glac_area = glac_area.set_index('time')
 # glac_area.plot()
 # plt.show()
+
 ## Validation
 
 # Adapt when parametrization is set up:
