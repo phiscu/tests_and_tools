@@ -66,10 +66,12 @@ output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-0
                                       TT_snow=0.354, TT_rain=0.5815, CFMAX_snow=4, CFMAX_ice=6,
                                       BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
                                       LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
-                                      AG=0.7, RHO_snow=300)
+                                      AG=0.7, RHO_snow=500)
 
 output_MATILDA[6].show()
 print(output_MATILDA[2].Q_Total)
+print(output_MATILDA[2].DDM_refreezing_snow)
+
 
 # 0.1*1000000**0.7
 ## Mit default parameters:
