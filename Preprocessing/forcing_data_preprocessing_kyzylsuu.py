@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import socket
 import os
+import cartopy.crs as ccrs
 from bias_correction import BiasCorrection
 
 warnings.filterwarnings("ignore")  # sklearn
@@ -18,7 +19,7 @@ elif 'cirrus' in host:
     home = '/data/projects/ebaca'
 else:
     home = str(Path.home()) + '/Seafile'
-wd = home + '/Ana-Lena_Phillip/data/matilda/Preprocessing'
+wd = home + '/Ana-Lena_Phillip/data/tests_and_tools/Preprocessing'
 os.chdir(wd + '/Downscaling')
 sys.path.append(wd)
 
@@ -81,9 +82,24 @@ era_temp_D_int2 = era_temp_D[slice('2011-11-01', '2016-01-01')]
 era_temp_D_int =  pd.concat([era_temp_D_int1, era_temp_D_int2], axis=0)      # Data gap of 18 days in October 2011
 
 
-era_temp_D.to_csv('/home/phillip/Seafile/Ana-Lena_Phillip/data/input_output/input/downscaling_error/example_scikitdownscale/reanalysis.csv')
-aws_temp_D.to_csv('/home/phillip/Seafile/Ana-Lena_Phillip/data/input_output/input/downscaling_error/example_scikitdownscale/obs.csv')
+# era_temp_D.to_csv('/home/phillip/Seafile/Ana-Lena_Phillip/data/input_output/input/downscaling_error/example_scikitdownscale/reanalysis.csv')
+# aws_temp_D.to_csv('/home/phillip/Seafile/Ana-Lena_Phillip/data/input_output/input/downscaling_error/example_scikitdownscale/obs.csv')
 
+
+## HARv2:
+
+har_ds = xr.open_dataset(home + "/EBA-CA/Tianshan_data/HARv2/variables/all_variables_HARv2_daily_kyzylsuu_1980_2020.nc")
+# Select grid cell most similar to mean catchment altitude which also contains the AWS:
+aws_lat = 42.191433; aws_lon = 78.200253
+# Transform coordinates to CRS of the data (Lambert Conformal, arguments retrieved from NCDF-Metadata)
+data_crs = ccrs.LambertConformal(central_longitude=83, central_latitude=31.99998856, standard_parallels=(32, 38))
+x, y = data_crs.transform_point(aws_lon, aws_lat, src_crs=ccrs.PlateCarree())
+pick = har_ds.sel(south_north=y, west_east=x, method='nearest')
+har = pick.to_dataframe().filter(['t2', 'prcp'])
+har.rename(columns={'t2':'t2m','prcp':'tp'}, inplace=True)
+har.tp = har.tp * 24            # Precipitation is in mm h^⁻1
+
+har.to_csv(home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/harv2/t2m_tp_HARv2_kyzylsuu_42.21_78.23_1980_2020.csv')
 
 ## CMIP6:
 
@@ -95,7 +111,7 @@ cmip.columns = era.columns
 cmip = cmip.resample('D').agg({'t2m': 'mean', 'tp': 'sum'})      # Already daily but wrong daytime (12:00:00).
 cmip = cmip.interpolate(method='spline', order=2)       # Only 3 days in 100 years, only 3 in fitting period.
 
-cmip[['t2m']].to_csv('/home/phillip/Seafile/Ana-Lena_Phillip/data/input_output/input/downscaling_error/example_scikitdownscale/scenario.csv')
+# cmip[['t2m']].to_csv('/home/phillip/Seafile/Ana-Lena_Phillip/data/input_output/input/downscaling_error/example_scikitdownscale/scenario.csv')
 
 
 ## Overview

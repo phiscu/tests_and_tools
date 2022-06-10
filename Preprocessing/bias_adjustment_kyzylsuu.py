@@ -1,3 +1,4 @@
+##
 import pandas as pd
 from pathlib import Path
 import sys
@@ -12,7 +13,7 @@ elif 'cirrus' in host:
     home = '/data/projects/ebaca'
 else:
     home = str(Path.home()) + '/Seafile'
-wd = home + '/Ana-Lena_Phillip/data/matilda/Preprocessing'
+wd = home + '/Ana-Lena_Phillip/data/tests_and_tools/Preprocessing'
 os.chdir(wd + '/Downscaling')
 sys.path.append(wd)
 
@@ -55,6 +56,19 @@ era_temp_int1 = era_temp[slice('2007-08-10', '2011-10-11')]
 era_temp_int2 = era_temp[slice('2011-11-01', '2016-01-01')]
 era_temp_int = pd.concat([era_temp_int1, era_temp_int2], axis=0)  # Data gap of 18 days in October 2011
 # era_temp_int.to_csv(era_path + 't2m-with-gap_era5l_42.516-79.0167_2007-08-10-2016-01-01.csv')
+
+
+## HARv2:
+
+har_path = home + "/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/harv2/"
+har = pd.read_csv(har_path + 't2m_tp_HARv2_kyzylsuu_42.21_78.23_1980_2020.csv', parse_dates=["time"], index_col="time")
+
+har_temp_int1 = har[slice('2007-08-10', '2011-10-11')].t2m
+har_temp_int2 = har[slice('2011-11-01', '2014-12-31')].t2m
+har_temp_int = pd.concat([har_temp_int1, har_temp_int2], axis=0)  # Data gap of 18 days in October 2011
+
+har_prec = har['tp']
+
 
 ## CMIP6:
 
@@ -140,6 +154,34 @@ era_corrP = pd.DataFrame(bc_era.correct(method='normal_mapping'))
 era_corrP[era_corrP < 0] = 0  # only needed when using normal mapping for precipitation
 era_corrP.to_csv(era_path + 'tp_era5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv')
 
+
+### HARv2:
+
+# Temperature:
+
+train_slice = slice('2007-08-10', '2016-01-01')
+predict_slice = slice('1980-01-01', '2020-12-31')
+
+x_train = har_temp_int[train_slice].squeeze()
+y_train = aws_temp_int[train_slice].squeeze()
+x_predict = har.t2m[predict_slice].squeeze()
+bc_har = BiasCorrection(y_train, x_train, x_predict)
+har_corrT = pd.DataFrame(bc_har.correct(method='normal_mapping'))
+har_corrT.to_csv(har_path + 't2m_harv2_adjust_42.21_78.23_1980-01-01-2020-12-31.csv')
+
+
+# Precipitation:
+
+train_slice = slice('2007-08-01', '2014-12-31')
+predict_slice = slice('1980-01-01', '2020-12-31')
+
+x_train = har.tp[train_slice].squeeze()
+y_train = aws_prec[train_slice].squeeze()
+x_predict = har.tp[predict_slice].squeeze()
+bc_har = BiasCorrection(y_train, x_train, x_predict)
+har_corrP = pd.DataFrame(bc_har.correct(method='normal_mapping'))
+har_corrP[har_corrP < 0] = 0  # only needed when using normal mapping for precipitation
+har_corrP.to_csv(har_path + 'tp_har5l_adjust_42.21_78.23_1980-01-01-2020-12-31.csv')
 
 ### CMIP:
 

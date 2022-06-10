@@ -88,38 +88,6 @@ plt.legend()
 plt.show()
 
 
-## Bias adjustment
-
-aws_temp_int = pd.read_csv(wd + '/met/obs/t2m-with-gap_aws_2007-08-10-2016-01-01.csv', parse_dates=["time"], index_col="time")
-aws_tp = pd.read_csv(wd + '/met/obs/tp_aws_2007-08-01-2016-01-01.csv', parse_dates=["time"], index_col="time")
-
-har_temp_int1 = har[slice('2007-08-10', '2011-10-11')].t2m_har
-har_temp_int2 = har[slice('2011-11-01', '2014-12-31')].t2m_har
-har_temp_int = pd.concat([har_temp_int1, har_temp_int2], axis=0)  # Data gap of 18 days in October 2011
-
-train_slice = slice('2007-08-10', '2014-12-31')
-predict_slice = slice('2007-01-01', '2014-12-31')
-
-# Temperature:
-
-x_train = har_temp_int[train_slice].squeeze()
-y_train = aws_temp_int[train_slice].squeeze()
-x_predict = har.t2m_har[predict_slice].squeeze()
-bc_har = BiasCorrection(y_train, x_train, x_predict)
-har_corrT = pd.DataFrame(bc_har.correct(method='normal_mapping'))
-# har_corrT.to_csv(har_path + 't2m_har5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv')
-
-
-# Precipitation:
-
-x_train = har.tp_har[train_slice].squeeze()
-y_train = aws_tp[train_slice].squeeze()
-x_predict = har.tp_har[predict_slice].squeeze()
-bc_har = BiasCorrection(y_train, x_train, x_predict)
-har_corrP = pd.DataFrame(bc_har.correct(method='normal_mapping'))
-har_corrP[har_corrP < 0] = 0  # only needed when using normal mapping for precipitation
-# har_corrP.to_csv(har_path + 'tp_har5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv')
-
 ## Matilda
 era = era_bc.reset_index()
 har = pd.concat([har_corrT, har_corrP], axis=1)
@@ -160,7 +128,9 @@ print(output_MATILDA_har[2].Q_Total)
 ## To-tries:
 
 # - Compare average precipitation of all grid cells (HAR & ERA) in the catchment to the observed
-# - perform bias adjustment for whole HAR dataset and store for later use
+# - run matilda with averaged catchment gridcells
+# - perform bias adjustment for whole HAR dataset and store for later use           - check!
+# - run matilda including the et series
 
 
 ## Results
