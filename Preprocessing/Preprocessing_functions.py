@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import probscale
 from matplotlib.legend import Legend
 import seaborn as sns
-sys.path.append(home + '/Ana-Lena_Phillip/data/matilda/Preprocessing')
+sys.path.append(home + '/Ana-Lena_Phillip/data/tests_and_tools/Preprocessing')
 from Downscaling.utils import prob_plots
 import warnings
 from datetime import datetime, timedelta

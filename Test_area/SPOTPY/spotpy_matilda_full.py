@@ -212,8 +212,6 @@ three = results[results['parTT_snow'] < results['parTT_rain']]
 
 ## Baustellen:
 
-# TT_snow kann höher sein als TT_rain.
-# Die CFMAX-Werte stehen in einem fixen Verhältnis.
 # Die Correction-Factors überblenden immer die gesamte Sensitivitäts-Analyse
 # Sollte die deltaH-Routine in der class mit eingebaut werden?
 
