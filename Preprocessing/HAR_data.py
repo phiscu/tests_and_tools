@@ -60,7 +60,8 @@ closest_lon = float(static_har.where(altitude_differences_gp == np.nanmin(altitu
 aws_lat = 42.191433; aws_lon = 78.200253
 
 # Transform coordinates to CRS of the data (Lambert Conformal, arguments retrieved from NCDF-Metadata)
-data_crs = ccrs.LambertConformal(central_longitude=83, central_latitude=31.99998856, standard_parallels=(32, 38))
+print(har_ds.PROJ_NAME)  # Check original CRS
+data_crs = ccrs.LambertConformal(central_longitude=float(har_ds.PROJ_CENTRAL_LON), central_latitude=float(har_ds.PROJ_CENTRAL_LAT), standard_parallels=(float(har_ds.PROJ_STANDARD_PAR1), float(har_ds.PROJ_STANDARD_PAR1)))
 x, y = data_crs.transform_point(closest_lon, closest_lat, src_crs=ccrs.PlateCarree())
 
 
@@ -69,6 +70,47 @@ har = pick.to_dataframe().filter(['t2', 'prcp'])
 har.rename(columns={'t2':'t2m_har','prcp':'tp_har'}, inplace=True)
 har.tp_har = har.tp_har * 24            # Precipitation is in mm h^⁻1
 har = har["2007-01-01T00:00:00":"2014-12-31T00:00:00"]
+
+## Area weighted average of gridcells in the catchment
+
+import rasterio
+
+shdf = salem.read_shapefile(home+ "/Seafile/Ana-Lena_Phillip/data/input_output/input/observations/karabatkak/static/shapefile_hydro_kyzylsuu.shp")
+
+shdf = gpd.read_file(home+ "/Seafile/Ana-Lena_Phillip/data/input_output/input/observations/karabatkak/static/shapefile_hydro_kyzylsuu.shp")
+
+# HAR:
+
+ShapeMask = rasterio.features.geometry_mask(shdf.iloc[0],
+                                      out_shape=(len(har_ds.south_north), len(har_ds.west_east)),
+                                      #transform=har_ds.geobox.transform,
+                                      invert=True)
+har_ds.attrs['crs'] = har_ds.PROJ_NAME
+
+#
+
+import rioxarray
+
+# Convert shapefile to wrf projection
+wrf_har_ds = salem.open_wrf_dataset(home + "/Seafile/EBA-CA/Tianshan_data/HARv2/variables/all_variables_HARv2_daily_kyzylsuu_1980_2020.nc")
+catchment = gpd.read_file(home+ "/Seafile/Ana-Lena_Phillip/data/input_output/input/observations/karabatkak/static/shapefile_hydro_kyzylsuu.shp")
+catchment = catchment.to_crs(wrf_har_ds.pyproj_srs)
+catchment.crs = wrf_har_ds.pyproj_srs
+
+clip = wrf_har_ds.salem.subset(shape=catchment, margin=0)        # APPEARS TO WORK!!!
+clip.t2.mean()
+
+
+fig = plt.figure(figsize=(16,12), dpi=300)
+ax = fig.add_subplot(111)
+catchment.plot(ax=ax, zorder=3)
+clip.t2.mean(dim='time').plot(ax=ax, zorder=-1)
+plt.scatter(x, y, color='r')
+plt.text(x,y, 'AWS')
+plt.show()
+
+
+
 
 
 ## Compare
@@ -160,17 +202,6 @@ plt.text(x,y, 'AWS')
 plt.show()
 
 
-
-
-
-
-
-### Convert shapefile to wrf projection ###
-wrf_har_ds = salem.open_wrf_dataset(home +"/Desktop/HAR/HARv2_d10km_d_2d_prcp_2000.nc")
-crop_extent_lat_lon = gpd.read_file(home+ "/Seafile/Ana-Lena_Phillip/data/input_output/input/observations/karabatkak/static/shapefile_hydro_kyzylsuu.shp")
-crop_extent_lat_lon = crop_extent_lat_lon.to_crs(wrf_har_ds.pyproj_srs)
-crop_extent_lat_lon.crs = wrf_har_ds.pyproj_srs
-crop_extent_lat_lon.to_file(har_path+'abramov_har_proj.shp')
 
 
 
