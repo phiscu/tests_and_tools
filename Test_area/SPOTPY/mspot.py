@@ -171,7 +171,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
 def psample(df, obs, rep=10, dbname='matilda_par_smpl', dbformat=None, obj_func=None, opt_iter=False, savefig=False,
             set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
             area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi=None,
-            interf=4, freqst=2, parallel=False, ngs=2,
+            interf=4, freqst=2, parallel=False, cores=2,
             algorithm='sceua', **kwargs):
 
     setup = spot_setup(set_up_start=set_up_start, set_up_end=set_up_end, sim_start=sim_start, sim_end=sim_end,
@@ -188,14 +188,16 @@ def psample(df, obs, rep=10, dbname='matilda_par_smpl', dbformat=None, obj_func=
 
     if parallel:
         sampler = alg_selector[algorithm](psample_setup, dbname=dbname, dbformat=dbformat, parallel='mpi')
-        if opt_iter:
-            if yesno("\n******** WARNING! Your optimum # of iterations is {0}. "
-                     "This may take a long time.\n******** Do you wish to proceed".format(psample_setup.par_iter)):
-                sampler.sample(psample_setup.par_iter, ngs=ngs)  # ideal number of reps = psample_setup.par_iter
-            else:
-                return
-        else:
+        if algorithm == 'mc' or algorithm == 'lhs' or algorithm == 'fast' or algorithm == 'rope':
             sampler.sample(rep)
+        elif algorithm == 'sceua':
+            sampler.sample(rep, ngs=cores)
+        elif algorithm == 'demcz':
+            sampler.sample(rep, nChains=cores)
+        else:
+            print('ERROR: The selected algorithm is ineligible for parallel computing.'
+                  'Either select a different algorithm (mc, lhs, fast, rope, sceua or demcz) or set "parallel = False".')
+            return
     else:
         sampler = alg_selector[algorithm](psample_setup, dbname=dbname, dbformat=dbformat)
         if opt_iter:

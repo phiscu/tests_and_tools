@@ -1,14 +1,12 @@
 # -*- coding: UTF-8 -*-
-"""
-MATILDA (Modeling wATer resources In gLacierizeD cAtchments) is a combination of a degree day model and the HBV model (Bergstöm 1976) to compute total runoff of glacierized catchments.
-This file may use the input files created by the COSIPY-utility "aws2cosipy" as forcing data and or a simple dataframe with temperature, precipitation and if possible evapotranspiration and additional observation runoff data to validate it.
-"""
+
 ## import of necessary packages
 import pandas as pd
 from pathlib import Path
 import sys
 import numpy as np
 import socket
+import spotpy
 import matplotlib.pyplot as plt
 host = socket.gethostname()
 if 'node' in host:
@@ -60,14 +58,14 @@ glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 # plt.show()
 
 ##
-output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
-                                      sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",
-                                      area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, # soi=[5, 10],
-                                      ele_dat=2550, ele_glac=4074, ele_cat=3225, lr_temp=-0.0059, lr_prec=0,
-                                      TT_snow=0.354, TT_diff=0.228, CFMAX_snow=4, CFMAX_rel=2,
-                                      BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
-                                      LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
-                                      AG=0.7, RHO_snow=500)
+# output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
+#                                       sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",
+#                                       area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, # soi=[5, 10],
+#                                       ele_dat=2550, ele_glac=4074, ele_cat=3225, lr_temp=-0.0059, lr_prec=0,
+#                                       TT_snow=0.354, TT_diff=0.228, CFMAX_snow=4, CFMAX_rel=2,
+#                                       BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
+#                                       LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
+#                                       AG=0.7, RHO_snow=500)
 #
 # output_MATILDA[6].show()
 # print(output_MATILDA[2].Q_Total)
@@ -77,22 +75,33 @@ output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-0
 
 ## Run SPOTPY:
 
-best_summary = mspot.psample(df=df, obs=obs, rep=300, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
+best_summary = mspot.psample(df=df, obs=obs, rep=100, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
                             sim_start='1985-01-01 00:00:00', sim_end='1989-12-31 23:00:00', freq="D",# soi=[5, 10],
-                            area_cat=315.694, area_glac=32.51, lat=42.33)
+                            area_cat=315.694, area_glac=32.51, lat=42.33, parallel=True, algorithm='rope')
 
-best_summary['par_uncertain_plot'].show()
-best_summary['best_run_plot'].show()
-best_summary['sampling_plot'].show()
+# setup = mspot.spot_setup(set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
+#                             sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",# soi=[5, 10],
+#                             area_cat=315.694, area_glac=32.51, lat=42.33)
+#
+# psample_setup = setup(df, obs)  # Define objective function using obj_func=, otherwise KGE is used.
+#
+# sampler = spotpy.algorithms.rope(psample_setup, dbname="dbname", dbformat=None, parallel='mpi')
+#
+# sampler.sample(10)
 
-best_param = pd.DataFrame(best_summary['best_param'], index=[0]).transpose()
-best_param.to_csv(output_path + "best_param_85-89_sceau300.csv")
 
-
-output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
-                                      sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",
-                                      area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, # soi=[5, 10],
-                                      ele_dat=2550, ele_glac=4074, ele_cat=3225, parameter_df=best_param)
+# best_summary['par_uncertain_plot'].show()
+# best_summary['best_run_plot'].show()
+# best_summary['sampling_plot'].show()
+#
+# best_param = pd.DataFrame(best_summary['best_param'], index=[0]).transpose()
+# best_param.to_csv(output_path + "best_param_85-89_sceau300.csv")
+#
+#
+# output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
+#                                       sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",
+#                                       area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, # soi=[5, 10],
+#                                       ele_dat=2550, ele_glac=4074, ele_cat=3225, parameter_df=best_param)
 
 # Irgendwie wird der parameter_df zwar gelesen aber nicht akzeptiert. KGE sollte 0.8555 betragen. Oder wird der anders berechnet?
 # Ergebnis von psample sollte direkt in MATILDA überführbar sein.
