@@ -174,7 +174,3 @@ rep = 100
 spot_setup = spot_setup(df, obs)
 sampler = spotpy.algorithms.mc(spot_setup, dbname='20210421_mpi_mc_hbv', dbformat=None, parallel='mpi')
 sampler.sample(rep)
-
-# Mit dieser Variante funktioniert MPI. Welche Funktion verhindert es bei psample?
-# Hiddenprints? Yesno? psample Funktion? par_iter?
-# console: mpirun -c 2 python3 /home/phillip/Seafile/Ana-Lena_Phillip/data/scripts/Test_area/spotpy_matilda_simple.py

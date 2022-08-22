@@ -12,7 +12,7 @@ from spotpy import analyser  # Load the Plotting extension
 home = str(Path.home())
 # sys.path.append(home + '/Ana-Lena_Phillip/data/tests_and_tools/Test_area/SPOTPY')
 # import mspot
-from MATILDA_slim import MATILDA
+from matilda.core import matilda_simulation
 
 
 # Create the MATILDA-SPOTPy-class
@@ -108,7 +108,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
 
         def simulation(self, x):
             with HiddenPrints():
-                sim = MATILDA.MATILDA_simulation(self.Input, obs=self.obs,
+                sim = matilda_simulation(self.Input, obs=self.obs,
                                                  output=None, set_up_start=set_up_start, set_up_end=set_up_end,
                                                  sim_start=sim_start, sim_end=sim_end, freq=freq, lat=lat, soi=soi,
                                                  area_cat=area_cat, area_glac=area_glac, ele_dat=ele_dat,
@@ -130,15 +130,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             obs_preproc = obs_preproc[sim_start:sim_end]
             # Changing the input unit from m³/s to mm.
             obs_preproc["Qobs"] = obs_preproc["Qobs"] * 86400 / (area_cat * 1000000) * 1000
-
-
-            # obs_preproc = obs_preproc.resample(freq).sum()
-            # # expanding the observation period to the length of the simulation, filling the NAs with 0
-            # idx = pd.date_range(start=sim_start, end=sim_end, freq=freq, name=obs_preproc.index.name)
-            # obs_preproc = obs_preproc.reindex(idx)
-            # obs_preproc = obs_preproc.fillna(0)
-
-        # Updated:
+            # To daily resolution
             obs_preproc = obs_preproc.resample("D").agg(pd.Series.sum, skipna=False)
             # Omit everything outside the specified season of interest (soi)
             if soi is not None:
@@ -150,116 +142,76 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
                                 name=obs_preproc.index.name)
             obs_preproc = obs_preproc.reindex(idx)
             obs_preproc = obs_preproc.fillna(np.NaN)
-        #
 
             return obs_preproc.Qobs
 
         def objectivefunction(self, simulation, evaluation, params=None):
             # SPOTPY expects to get one or multiple values back,
             # that define the performance of the model run
+
+            # Crop both timeseries to same periods without NAs
+            sim_new = pd.DataFrame()
+            sim_new['mod'] = pd.DataFrame(simulation)
+            sim_new['obs'] = evaluation
+            clean = sim_new.dropna()
+
+            simulation_clean = clean['obs']
+            evaluation_clean = clean['mod']
+
             if not self.obj_func:
                 # This is used if not overwritten by user
-                like = kge(evaluation, simulation)  # In den Beispielen ist hier ein "-" davor?!
+                like = kge(evaluation_clean, simulation_clean)
             else:
                 # Way to ensure flexible spot setup class
-                like = self.obj_func(evaluation, simulation)
+                like = self.obj_func(evaluation_clean, simulation_clean)
             return like
 
     return spot_setup
 
 
-def psample(df, obs, rep=10, dbname='matilda_par_smpl', dbformat=None, obj_func=None, opt_iter=False, savefig=False,
-            set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
-            area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi=None,
-            interf=4, freqst=2, parallel=False, cores=2,
-            algorithm='sceua', **kwargs):
 
-    setup = spot_setup(set_up_start=set_up_start, set_up_end=set_up_end, sim_start=sim_start, sim_end=sim_end,
-                        freq=freq, area_cat=area_cat, area_glac=area_glac, ele_dat=ele_dat, ele_glac=ele_glac,
-                        ele_cat=ele_cat, lat=lat, soi=soi, interf=interf, freqst=freqst, **kwargs)
+def analyze_results(sampling_data, obs, fig_path = None, dbname='mspot_results'):
 
-    psample_setup = setup(df, obs, obj_func)  # Define objective function using obj_func=, otherwise KGE is used.
-    alg_selector = {'mc': spotpy.algorithms.mc, 'sceua': spotpy.algorithms.sceua, 'mcmc': spotpy.algorithms.mcmc,
-                    'mle': spotpy.algorithms.mle, 'abc': spotpy.algorithms.abc, 'sa': spotpy.algorithms.sa,
-                    'dds': spotpy.algorithms.dds, 'demcz': spotpy.algorithms.demcz,
-                    'dream': spotpy.algorithms.dream, 'fscabc': spotpy.algorithms.fscabc,
-                    'lhs': spotpy.algorithms.lhs, 'padds': spotpy.algorithms.padds,
-                    'rope': spotpy.algorithms.rope}
+    if isinstance(obs, str):
+        obs = pd.read_csv(obs, index_col='Date', parse_dates=['Date'])
 
-    if parallel:
-        sampler = alg_selector[algorithm](psample_setup, dbname=dbname, dbformat=dbformat, parallel='mpi')
-        if algorithm == 'mc' or algorithm == 'lhs' or algorithm == 'fast' or algorithm == 'rope':
-            sampler.sample(rep)
-        elif algorithm == 'sceua':
-            sampler.sample(rep, ngs=cores)
-        elif algorithm == 'demcz':
-            sampler.sample(rep, nChains=cores)
-        else:
-            print('ERROR: The selected algorithm is ineligible for parallel computing.'
-                  'Either select a different algorithm (mc, lhs, fast, rope, sceua or demcz) or set "parallel = False".')
-            return
+    if isinstance(sampling_data, str):
+        if sampling_data.endswith('.csv'):
+            sampling_data = sampling_data[:len(sampling_data)-4]
+        results = spotpy.analyser.load_csv_results(sampling_data)
     else:
-        sampler = alg_selector[algorithm](psample_setup, dbname=dbname, dbformat=dbformat)
-        if opt_iter:
-            if yesno("\n******** WARNING! Your optimum # of iterations is {0}. "
-                     "This may take a long time.\n******** Do you wish to proceed".format(psample_setup.par_iter)):
-                sampler.sample(psample_setup.par_iter)  # ideal number of reps = psample_setup.par_iter
-            else:
-                return
-        else:
-            sampler.sample(rep)
+        results = sampling_data.getdata()
 
-    # if parallel:
-    #     sampler = spotpy.algorithms.sceua(psample_setup, dbname=dbname, dbformat=dbformat, parallel='mpi')
-    #     if opt_iter:
-    #         if yesno("\n******** WARNING! Your optimum # of iterations is {0}. "
-    #                  "This may take a long time.\n******** Do you wish to proceed".format(psample_setup.par_iter)):
-    #             sampler.sample(psample_setup.par_iter, ngs=ngs)  # ideal number of reps = psample_setup.par_iter
-    #         else:
-    #             return
-    #     else:
-    #         sampler.sample(rep)
-    # else:
-    #     sampler = spotpy.algorithms.sceua(psample_setup, dbname=dbname, dbformat=dbformat)
-    #     if opt_iter:
-    #         if yesno("\n******** WARNING! Your optimum # of iterations is {0}. "
-    #                  "This may take a long time.\n******** Do you wish to proceed".format(psample_setup.par_iter)):
-    #             sampler.sample(psample_setup.par_iter)  # ideal number of reps = psample_setup.par_iter
-    #         else:
-    #             return
-    #     else:
-    #         sampler.sample(rep)
-
-    # Change dbformat to None for short tests but to 'csv' or 'sql' to avoid data loss in case off long calculations.
-
-    results = sampler.getdata()
     best_param = spotpy.analyser.get_best_parameterset(results)
     par_names = spotpy.analyser.get_parameternames(best_param)
     param_zip = zip(par_names, best_param[0])
     best_param = dict(param_zip)
 
+    sim_start = obs.index[0]
+    sim_end = obs.index[-1]
+
     bestindex, bestobjf = spotpy.analyser.get_maxlikeindex(results)  # Run with highest KGE
     best_model_run = results[bestindex]
     fields = [word for word in best_model_run.dtype.names if word.startswith('sim')]
     best_simulation = pd.Series(list(list(best_model_run[fields])[0]), index=pd.date_range(sim_start, sim_end))
-    # Only necessary because psample_setup.evaluation() has a datetime. Thus both need a datetime.
+    # Only necessary because obs has a datetime. Thus, both need a datetime.
 
     fig1 = plt.figure(1, figsize=(9, 5))
     plt.plot(results['like1'])
     plt.ylabel('KGE')
     plt.xlabel('Iteration')
-    if savefig:
-        plt.savefig(dbname + '_sampling_plot.png')
+    if fig_path is not None:
+        plt.savefig(fig_path + '/' + dbname + '_sampling_plot.png')
 
     fig2 = plt.figure(figsize=(16, 9))
     ax = plt.subplot(1, 1, 1)
     ax.plot(best_simulation, color='black', linestyle='solid', label='Best objf.=' + str(bestobjf))
-    ax.plot(psample_setup.evaluation(), 'r.', markersize=3, label='Observation data')
+    ax.plot(obs, 'r.', markersize=3, label='Observation data')
     plt.xlabel('Date')
     plt.ylabel('Discharge [mm d-1]')
     plt.legend(loc='upper right')
-    if savefig:
-        plt.savefig(dbname + '_best_run_plot.png')
+    if fig_path is not None:
+        plt.savefig(fig_path + '/' + dbname + '_best_run_plot.png')
 
     fig3 = plt.figure(figsize=(16, 9))
     ax = plt.subplot(1, 1, 1)
@@ -271,14 +223,74 @@ def psample(df, obs, rep=10, dbname='matilda_par_smpl', dbformat=None, obj_func=
     ax.plot(q95, color='dimgrey', linestyle='solid')
     ax.fill_between(np.arange(0, len(q5), 1), list(q5), list(q95), facecolor='dimgrey', zorder=0,
                     linewidth=0, label='parameter uncertainty')
-    ax.plot(np.array(psample_setup.evaluation()), 'r.',
+    ax.plot(np.array(obs), 'r.',
             label='data')  # Need to remove Timestamp from Evaluation to make comparable
-    ax.set_ylim(0, 100)
-    ax.set_xlim(0, len(psample_setup.evaluation()))
+    # ax.set_ylim(0, 100)
+    ax.set_xlim(0, len(obs))
     ax.legend()
-    if savefig:
-        plt.savefig(dbname + '_par_uncertain_plot.png')
+    if fig_path is not None:
+        plt.savefig(fig_path + '/' + dbname + '_par_uncertain_plot.png')
 
     return {'best_param': best_param, 'best_index': bestindex, 'best_model_run': best_model_run, 'best_objf': bestobjf,
-            'best_simulation': best_simulation, 'param': psample_setup.param,
-            'opt_iter': psample_setup.par_iter, 'sampling_plot': fig1, 'best_run_plot': fig2, 'par_uncertain_plot': fig3}
+            'best_simulation': best_simulation,
+            'sampling_plot': fig1, 'best_run_plot': fig2, 'par_uncertain_plot': fig3}
+
+
+def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=None, obj_func=None, opt_iter=False, fig_path=None, #savefig=False,
+            set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
+            area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi=None,
+            interf=4, freqst=2, parallel=False, cores=2, save_sim=True,
+            algorithm='sceua', **kwargs):
+
+    cwd = os.getcwd()
+    if output is not None:
+        os.chdir(output)
+
+    setup = spot_setup(set_up_start=set_up_start, set_up_end=set_up_end, sim_start=sim_start, sim_end=sim_end,
+                        freq=freq, area_cat=area_cat, area_glac=area_glac, ele_dat=ele_dat, ele_glac=ele_glac,
+                        ele_cat=ele_cat, lat=lat, soi=soi, interf=interf, freqst=freqst, **kwargs)
+
+    psample_setup = setup(df, obs, obj_func)  # Define objective function using obj_func=, otherwise KGE is used.
+    alg_selector = {'mc': spotpy.algorithms.mc, 'sceua': spotpy.algorithms.sceua, 'mcmc': spotpy.algorithms.mcmc,
+                    'mle': spotpy.algorithms.mle, 'abc': spotpy.algorithms.abc, 'sa': spotpy.algorithms.sa,
+                    'dds': spotpy.algorithms.dds, 'demcz': spotpy.algorithms.demcz,
+                    'dream': spotpy.algorithms.dream, 'fscabc': spotpy.algorithms.fscabc,
+                    'lhs': spotpy.algorithms.lhs, 'padds': spotpy.algorithms.padds,
+                    'rope': spotpy.algorithms.rope, 'fast': spotpy.algorithms.fast}
+
+    if parallel:
+        sampler = alg_selector[algorithm](psample_setup, dbname=dbname, dbformat=dbformat, parallel='mpi', save_sim=save_sim)
+        if algorithm == 'mc' or algorithm == 'lhs' or algorithm == 'fast' or algorithm == 'rope':
+            sampler.sample(rep)
+        elif algorithm == 'sceua':
+            sampler.sample(rep, ngs=cores)
+        elif algorithm == 'demcz':
+            sampler.sample(rep, nChains=cores)
+        else:
+            print('ERROR: The selected algorithm is ineligible for parallel computing.'
+                  'Either select a different algorithm (mc, lhs, fast, rope, sceua or demcz) or set "parallel = False".')
+            return
+    else:
+        sampler = alg_selector[algorithm](psample_setup, dbname=dbname, dbformat=dbformat, save_sim=save_sim)
+        if opt_iter:
+            if yesno("\n******** WARNING! Your optimum # of iterations is {0}. "
+                     "This may take a long time.\n******** Do you wish to proceed".format(psample_setup.par_iter)):
+                sampler.sample(psample_setup.par_iter)  # ideal number of reps = psample_setup.par_iter
+            else:
+                return
+        else:
+            sampler.sample(rep)
+
+    # Change dbformat to None for short tests but to 'csv' or 'sql' to avoid data loss in case off long calculations.
+
+    psample_setup.evaluation().to_csv(dbname + '_observations.csv')
+
+    if not parallel:
+
+        results = analyze_results(sampler, psample_setup.evaluation(), fig_path=fig_path, dbname=dbname)
+
+        return results
+
+    os.chdir(cwd)
+
+

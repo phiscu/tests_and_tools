@@ -9,11 +9,13 @@ from pysheds.grid import Grid
 import fiona
 import geopandas as gpd
 import subprocess
+import xarray as xr
 import warnings
 warnings.filterwarnings('ignore')
 
 ## Paths
 working_directory = home + "/Seafile/Hackathon_Patagonia2022/"
+data_dir = working_directory + "CAMELS_CL_v202201/"
 # input_DEM = home + "/Seafile/EBA-CA/Azamat_AvH/workflow/data/Jyrgalang/static/jyrgalang_dem_alos.tif"
 RGI_files = home + "/Seafile/Hackathon_Patagonia2022/17_rgi60_SouthernAndes/17_rgi60_SouthernAndes.shp"
 catchments = home + "/Seafile/Hackathon_Patagonia2022/CAMELS_CL_v202201/camels_cl_boundaries/camels_cl_boundaries.shp"
@@ -61,12 +63,23 @@ glac_copy.drop('geometry', axis=1).to_csv(output_path + 'catchments_with_glacier
 glaciers_catchment.drop('geometry', axis=1).to_csv(output_path + 'catchments_with_glaciers.csv', index=False)
 
 
-# glaciers_catchment_compact = glaciers_catchment.iloc[:, 4:len(glaciers_catchment.columns)-1]
-# glaciers_catchment_compact = glaciers_catchment_compact.sort_values(by='gauge_id')
-# glac_area = glaciers_catchment_compact.groupby(['gauge_id'])['Area'].sum().reset_index()
-# glac_area = glac_area.sort_values(by='gauge_id')
-#
-# glaciers_catchment_compact = glaciers_catchment_compact.groupby(['gauge_id']).first().reset_index().drop(['Area'], axis=1)
-# glaciers_catchment_compact['glaciated_area'] = glac_area['Area']
-# glaciers_catchment_compact['glaciated_fraction'] = glaciers_catchment_compact['glaciated_area'] /glaciers_catchment_compact['area_km2']
-# glaciers_catchment_compact.to_csv(output_path + 'catchments_with_glaciers_compact.csv')
+
+
+## Data analysis
+
+# data = xr.open_dataset(output_path + "camels_cl_v202201.nc")
+
+prec = pd.read_csv(data_dir + "precip_mswep_mm_mon.csv", index_col='date', parse_dates=['date'])
+pet = pd.read_csv(data_dir + "pet_hargreaves_mm_mon.csv", index_col='date', parse_dates=['date'])
+runoff = pd.read_csv(data_dir + "q_mm_mon.csv", index_col='date', parse_dates=['date'])
+# swe = pd.read_csv(data_dir + "cons_sf_wr_Ls_year.csv", index_col='date', parse_dates=['date'])
+
+catchm_attr = pd.read_csv(data_dir + "catchment_attributes.csv")
+
+for i in [prec, pet, runoff]: i.drop(i.columns[[0,1,2]], axis=1, inplace=True)      # Delete additional date columns
+
+excess = runoff - prec - pet
+
+excess.mean().to_csv(output_path + "excess_runoff_potential.csv")
+runoff.mean().to_csv(output_path + "runoff_mon_mean.csv")
+

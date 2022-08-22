@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 ## import of necessary packages
+import os
 import pandas as pd
 from pathlib import Path
 import sys
@@ -15,12 +16,10 @@ elif 'cirrus' in host:
     home = '/data/projects/ebaca'
 else:
     home = str(Path.home()) + '/Seafile'
-# sys.path.append(home + '/Ana-Lena_Phillip/data/matilda/MATILDA')
-# sys.path.append(home + '/Ana-Lena_Phillip/data/scripts/Test_area')
 sys.path.append(home + '/Ana-Lena_Phillip/data/tests_and_tools')
 from Preprocessing.Preprocessing_functions import dmod_score, load_cmip, cmip2df
 from Test_area.SPOTPY import mspot
-from MATILDA_slim import MATILDA
+from matilda.core import matilda_simulation
 
 ## Setting file paths and parameters
     # Paths
@@ -40,44 +39,61 @@ df = pd.concat([t2m, tp.tp], axis=1)
 df.rename(columns={'time': 'TIMESTAMP', 't2m': 'T2','tp':'RRR'}, inplace=True)
 obs = pd.read_csv(input_path + runoff_obs)
 
-    # Senarios
+    # Scenarios
 cmipT = load_cmip(input_path + cmip_path, 't2m_CMIP6_all_models_adjusted_42.516-79.0167_1982-01-01-2100-12-31_')
 cmipP = load_cmip(input_path + cmip_path, 'tp_CMIP6_all_models_adjusted_42.516-79.0167_1982-01-01-2100-12-31_')
 glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 
 
 # Basic overview plot
-# obs_fig = obs.copy()
-# obs_fig.set_index('Date', inplace=True)
-# obs_fig.index = pd.to_datetime(obs_fig.index)
-# # obs_fig = obs_fig[slice('1984-10-01','1985-01-31')]
-# plt.figure()
-# ax = obs_fig.plot(label='Kyzylsuu (Hydromet)')
-# ax.set_ylabel('Discharge [m³/s]')
-#
-# plt.show()
+obs_fig = obs.copy()
+obs_fig.set_index('Date', inplace=True)
+obs_fig.index = pd.to_datetime(obs_fig.index)
+# obs_fig = obs_fig[slice('1984-10-01','1985-01-31')]
+plt.figure()
+ax = obs_fig.resample('M').sum().plot(label='Kyzylsuu (Hydromet)')
+ax.set_ylabel('Discharge [m³/s]')
+
+plt.show()
+
+##> Data from 1982-01-01 to 1989-12-31 [8y], 1992-01-01 to 2007-12-31 [16y], 2010-01-01 to 2014-12-31 [5y], 2017-05-04 to 2021-07-30 [4y]
 
 ##
-# output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
-#                                       sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",
-#                                       area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, # soi=[5, 10],
-#                                       ele_dat=2550, ele_glac=4074, ele_cat=3225, lr_temp=-0.0059, lr_prec=0,
-#                                       TT_snow=0.354, TT_diff=0.228, CFMAX_snow=4, CFMAX_rel=2,
-#                                       BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
-#                                       LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
-#                                       AG=0.7, RHO_snow=500)
-#
-# output_MATILDA[6].show()
-# print(output_MATILDA[2].Q_Total)
-# print(output_MATILDA[2].DDM_refreezing_snow)
+output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
+                                      sim_start='1982-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D", #glacier_profile=glacier_profile,
+                                      area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, plot_type="all", plots=False,
+                                      ele_dat=2550, ele_glac=4074, ele_cat=3225,
+
+                                      lr_temp=-0.0059, lr_prec=0, TT_snow=0.354, TT_diff=0.228, CFMAX_snow=4, CFMAX_rel=2,
+                                      BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
+                                      LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
+                                      AG=0.7, RHO_snow=500)
+
+output_MATILDA[6].show()
+
+print(output_MATILDA[2].Q_Total)
+print(output_MATILDA[2].DDM_refreezing_snow)
 
 
 
 ## Run SPOTPY:
 
-best_summary = mspot.psample(df=df, obs=obs, rep=100, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
-                            sim_start='1985-01-01 00:00:00', sim_end='1989-12-31 23:00:00', freq="D",# soi=[5, 10],
-                            area_cat=315.694, area_glac=32.51, lat=42.33, parallel=True, algorithm='rope')
+best_summary = mspot.psample(df=df, obs=obs, rep=5,# output= output_path,
+                            set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00',
+                            sim_start='1985-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D",# soi=[5, 10],
+                            area_cat=315.694, area_glac=32.51, lat=42.33, parallel=False, algorithm='mcmc', cores=20,
+                            dbname='matilda_par_smpl_test', dbformat='csv')
+
+
+
+# results = spotpy.analyser.load_csv_results('matilda_par_smpl_test')
+# sampling_csv = output_path + '/matilda_par_smpl_test.csv'
+# sampling_obs = output_path + '/matilda_par_smpl_test_observations.csv'
+#
+# results = mspot.analyze_results(sampling_csv, sampling_obs)
+# results['sampling_plot'].show()
+# results['best_run_plot'].show()
+# results['par_uncertain_plot'].show()
 
 # setup = mspot.spot_setup(set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
 #                             sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",# soi=[5, 10],
@@ -121,16 +137,23 @@ best_summary = mspot.psample(df=df, obs=obs, rep=100, set_up_start='1982-01-01 0
 
 ## With glacier change
 
-# df_scen = cmip2df(cmipT, cmipP, 'ssp1', 'mean')
-#
-# output_MATILDA = MATILDA.MATILDA_simulation(df_scen, output=None, set_up_start='2017-01-01 00:00:00', set_up_end='2020-12-31 23:00:00',
-#                                       sim_start='2021-01-01 00:00:00', sim_end='2030-12-31 23:00:00', freq="D",
-#                                       area_cat=315.694, area_glac=32.51, lat=42.33, glacier_profile= glacier_profile,
-#                                       ele_dat=2550, ele_glac=4074, ele_cat=3225, lr_temp=-0.0059, lr_prec=-0.0002503,
-#                                       TT_snow=0.354, TT_rain=0.5815, CFMAX_snow=4, CFMAX_ice=6, CFR_snow=0.08765,
-#                                       CFR_ice=0.01132, BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
-#                                       LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765)
-# output_MATILDA[6].show()
+df_scen1 = cmip2df(cmipT, cmipP, 'ssp1', 'mean')
+out_scen = '/home/phillip/Seafile/Alex_Phillip/Scenarios/'
+
+for i in cmipT.keys():
+    df_scen = cmip2df(cmipT, cmipP, i, 'mean')
+    output_MATILDA = matilda_simulation(df_scen, output=out_scen, set_up_start='2018-01-01 00:00:00', set_up_end='2020-12-31 23:00:00',
+                                      sim_start='2021-01-01 00:00:00', sim_end='2100-12-31 23:00:00', freq="D",
+                                      area_cat=315.694, area_glac=32.51, lat=42.33, glacier_profile=glacier_profile,
+                                      ele_dat=2550, ele_glac=4074, ele_cat=3225, lr_temp=-0.0059, lr_prec=-0.0002,
+                                      TT_snow=0.354, TT_diff=0.228, CFMAX_snow=4, CFMAX_rel=2,
+                                      BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
+                                      LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
+                                      AG=0.7, RHO_snow=500)
+
+
+
+output_MATILDA[6].show()
 #
 # glac_area = output_MATILDA[4].iloc[:,:-1]
 # glac_area = glac_area.set_index('time')
