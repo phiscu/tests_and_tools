@@ -42,7 +42,7 @@ def yesno(question):
 
 
 def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
-               area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi = None,
+               area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi = None, glacier_profile=None,
             lr_temp_lo=-0.01, lr_temp_up=-0.003,
             lr_prec_lo=0, lr_prec_up=0.002,
             BETA_lo=1, BETA_up=6,
@@ -113,6 +113,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
                                                  sim_start=sim_start, sim_end=sim_end, freq=freq, lat=lat, soi=soi,
                                                  area_cat=area_cat, area_glac=area_glac, ele_dat=ele_dat,
                                                  ele_glac=ele_glac, ele_cat=ele_cat, plots=False, warn=False,
+                                                 glacier_profile=glacier_profile,
 
                                                  lr_temp=x.lr_temp, lr_prec=x.lr_prec,
                                                  BETA=x.BETA, CET=x.CET, FC=x.FC, K0=x.K0, K1=x.K1, K2=x.K2, LP=x.LP,
@@ -121,7 +122,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
                                                  CFMAX_rel=x.CFMAX_rel, SFCF=x.SFCF, CWH=x.CWH, AG=x.AG, RHO_snow=x.RHO_snow)
 
             # return sim[366:]  # excludes the first year as a spinup period
-            return sim[0].Q_Total
+            return sim[0].total_runoff
 
         def evaluation(self):
             obs_preproc = self.obs.copy()
@@ -238,7 +239,7 @@ def analyze_results(sampling_data, obs, fig_path = None, dbname='mspot_results')
 
 def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=None, obj_func=None, opt_iter=False, fig_path=None, #savefig=False,
             set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
-            area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi=None,
+            area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi=None, glacier_profile=None,
             interf=4, freqst=2, parallel=False, cores=2, save_sim=True,
             algorithm='sceua', **kwargs):
 
@@ -247,8 +248,9 @@ def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=
         os.chdir(output)
 
     setup = spot_setup(set_up_start=set_up_start, set_up_end=set_up_end, sim_start=sim_start, sim_end=sim_end,
-                        freq=freq, area_cat=area_cat, area_glac=area_glac, ele_dat=ele_dat, ele_glac=ele_glac,
-                        ele_cat=ele_cat, lat=lat, soi=soi, interf=interf, freqst=freqst, **kwargs)
+                    freq=freq, area_cat=area_cat, area_glac=area_glac, ele_dat=ele_dat, ele_glac=ele_glac,
+                    ele_cat=ele_cat, lat=lat, soi=soi, interf=interf, freqst=freqst, glacier_profile=glacier_profile,
+                    **kwargs)
 
     psample_setup = setup(df, obs, obj_func)  # Define objective function using obj_func=, otherwise KGE is used.
     alg_selector = {'mc': spotpy.algorithms.mc, 'sceua': spotpy.algorithms.sceua, 'mcmc': spotpy.algorithms.mcmc,

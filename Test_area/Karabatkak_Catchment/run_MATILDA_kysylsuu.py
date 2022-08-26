@@ -46,22 +46,22 @@ glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 
 
 # Basic overview plot
-obs_fig = obs.copy()
-obs_fig.set_index('Date', inplace=True)
-obs_fig.index = pd.to_datetime(obs_fig.index)
-# obs_fig = obs_fig[slice('1984-10-01','1985-01-31')]
-plt.figure()
-ax = obs_fig.resample('M').sum().plot(label='Kyzylsuu (Hydromet)')
-ax.set_ylabel('Discharge [m³/s]')
-
-plt.show()
+# obs_fig = obs.copy()
+# obs_fig.set_index('Date', inplace=True)
+# obs_fig.index = pd.to_datetime(obs_fig.index)
+# # obs_fig = obs_fig[slice('1984-10-01','1985-01-31')]
+# plt.figure()
+# ax = obs_fig.resample('D').sum().plot(label='Kyzylsuu (Hydromet)')
+# ax.set_ylabel('Discharge [m³/s]')
+#
+# plt.show()
 
 ##> Data from 1982-01-01 to 1989-12-31 [8y], 1992-01-01 to 2007-12-31 [16y], 2010-01-01 to 2014-12-31 [5y], 2017-05-04 to 2021-07-30 [4y]
 
 ##
 output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
-                                      sim_start='1982-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D", #glacier_profile=glacier_profile,
-                                      area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, plot_type="all", plots=False,
+                                      sim_start='1982-01-01 00:00:00', sim_end='1990-12-31 23:00:00', freq="M", glacier_profile=glacier_profile,
+                                      area_cat=315.694, area_glac=32.51, lat=42.33, warn=False, plot_type="all", plots=False,
                                       ele_dat=2550, ele_glac=4074, ele_cat=3225,
 
                                       lr_temp=-0.0059, lr_prec=0, TT_snow=0.354, TT_diff=0.228, CFMAX_snow=4, CFMAX_rel=2,
@@ -69,19 +69,19 @@ output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:
                                       LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
                                       AG=0.7, RHO_snow=500)
 
-output_MATILDA[6].show()
 
-print(output_MATILDA[2].Q_Total)
-print(output_MATILDA[2].DDM_refreezing_snow)
-
+output_MATILDA[0].columns
 
 
 ## Run SPOTPY:
 
-best_summary = mspot.psample(df=df, obs=obs, rep=5,# output= output_path,
-                            set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00',
-                            sim_start='1985-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D",# soi=[5, 10],
-                            area_cat=315.694, area_glac=32.51, lat=42.33, parallel=False, algorithm='mcmc', cores=20,
+best_summary = mspot.psample(df=df, obs=obs, rep=100,# output= output_path,
+                            set_up_start='1997-01-01 00:00:00', set_up_end='1999-12-31 23:00:00',
+                            sim_start='2000-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D",# soi=[5, 10],
+                            area_cat=315.694, area_glac=32.51, lat=42.33,
+                            ele_dat=2550, ele_glac=4074, ele_cat=3225,
+                            glacier_profile=glacier_profile,
+                            parallel=False, algorithm='sceua', cores=20,
                             dbname='matilda_par_smpl_test', dbformat='csv')
 
 
