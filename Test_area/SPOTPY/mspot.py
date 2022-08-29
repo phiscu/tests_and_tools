@@ -63,14 +63,14 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             SFCF_lo=0.4, SFCF_up=1,
             CWH_lo=0, CWH_up=0.2,
             AG_lo=0, AG_up=1,
-            RHO_snow_lo=300, RHO_snow_up=500,
+            RFS_lo=0.05, RFS_up=0.25,
 
             interf=4, freqst=2):
 
     class spot_setup:
         # defining all parameters and the distribution
         param = lr_temp, lr_prec, BETA, CET, FC, K0, K1, K2, LP, MAXBAS, PERC, UZL, PCORR, \
-                TT_snow, TT_diff, CFMAX_snow, CFMAX_rel, SFCF, CWH, AG, RHO_snow  = [
+                TT_snow, TT_diff, CFMAX_snow, CFMAX_rel, SFCF, CWH, AG, RFS = [
             Uniform(low=lr_temp_lo, high=lr_temp_up),  # lr_temp
             Uniform(low=lr_prec_lo, high=lr_prec_up),  # lr_prec
             Uniform(low=BETA_lo, high=BETA_up),  # BETA
@@ -91,7 +91,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             Uniform(low=SFCF_lo, high=SFCF_up),  # SFCF
             Uniform(low=CWH_lo, high=CWH_up),  # CWH
             Uniform(low=AG_lo, high=AG_up),  # AG
-            Uniform(low=RHO_snow_lo, high=RHO_snow_up),  # RHO_snow
+            Uniform(low=RFS_lo, high=RFS_up),  # RFS
         ]
 
         # Number of needed parameter iterations for parametrization and sensitivity analysis
@@ -119,7 +119,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
                                                  BETA=x.BETA, CET=x.CET, FC=x.FC, K0=x.K0, K1=x.K1, K2=x.K2, LP=x.LP,
                                                  MAXBAS=x.MAXBAS, PERC=x.PERC, UZL=x.UZL, PCORR=x.PCORR,
                                                  TT_snow=x.TT_snow, TT_diff=x.TT_diff, CFMAX_snow=x.CFMAX_snow,
-                                                 CFMAX_rel=x.CFMAX_rel, SFCF=x.SFCF, CWH=x.CWH, AG=x.AG, RHO_snow=x.RHO_snow)
+                                                 CFMAX_rel=x.CFMAX_rel, SFCF=x.SFCF, CWH=x.CWH, AG=x.AG, RFS=x.RFS)
 
             # return sim[366:]  # excludes the first year as a spinup period
             return sim[0].total_runoff
@@ -296,3 +296,9 @@ def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=
     os.chdir(cwd)
 
 
+def load_parameters(path):
+    sampling_csv = path
+    sampling_obs = path.split('.')[0].split('/')[-1] + '_observations.csv'
+    results = analyze_results(sampling_csv, sampling_obs)
+
+    return results['best_param']

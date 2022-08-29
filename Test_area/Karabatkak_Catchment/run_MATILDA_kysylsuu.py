@@ -45,94 +45,85 @@ cmipP = load_cmip(input_path + cmip_path, 'tp_CMIP6_all_models_adjusted_42.516-7
 glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 
 
-# Basic overview plot
+# # Basic overview plot
 # obs_fig = obs.copy()
 # obs_fig.set_index('Date', inplace=True)
 # obs_fig.index = pd.to_datetime(obs_fig.index)
-# # obs_fig = obs_fig[slice('1984-10-01','1985-01-31')]
+# obs_fig = obs_fig[slice('1998-01-01','2020-01-31')]
 # plt.figure()
-# ax = obs_fig.resample('D').sum().plot(label='Kyzylsuu (Hydromet)')
+# ax = obs_fig.resample('M').agg(pd.Series.sum, min_count=1).plot(label='Kyzylsuu (Hydromet)')
 # ax.set_ylabel('Discharge [m³/s]')
-#
 # plt.show()
 
 ##> Data from 1982-01-01 to 1989-12-31 [8y], 1992-01-01 to 2007-12-31 [16y], 2010-01-01 to 2014-12-31 [5y], 2017-05-04 to 2021-07-30 [4y]
 
 ##
-output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
-                                      sim_start='1982-01-01 00:00:00', sim_end='1990-12-31 23:00:00', freq="M", glacier_profile=glacier_profile,
-                                      area_cat=315.694, area_glac=32.51, lat=42.33, warn=False, plot_type="all", plots=False,
+output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1998-01-01 00:00:00', set_up_end='1999-12-31 23:00:00', #output=output_path,
+                                      sim_start='2000-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D", glacier_profile=glacier_profile,
+                                      area_cat=315.694, area_glac=32.51, lat=42.33, warn=False, plot_type="all", plots=True,
                                       ele_dat=2550, ele_glac=4074, ele_cat=3225,
 
-                                      lr_temp=-0.0059, lr_prec=0, TT_snow=0.354, TT_diff=0.228, CFMAX_snow=4, CFMAX_rel=2,
-                                      BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
-                                      LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765,
-                                      AG=0.7, RHO_snow=500)
+                                      lr_temp=-0.003529, lr_prec=0.001832, BETA=5.617, CET=0.2964, FC=473.5, K0=0.2966,
+                                      K1=0.01198, K2=0.004498, LP=0.9346, MAXBAS=3.21, PERC=1.303, UZL=210.2,
+                                      PCORR=0.91, TT_snow=-1.202, TT_diff=2.02, CFMAX_snow=3.676, CFMAX_rel=1.689,
+                                      SFCF=0.6553, CWH=0.1782, AG=0.6494, RFS=0.2)
 
 
-output_MATILDA[0].columns
+
+
+output_MATILDA[7].show()
+
+plt.show()
 
 
 ## Run SPOTPY:
 
-best_summary = mspot.psample(df=df, obs=obs, rep=100,# output= output_path,
+best_summary = mspot.psample(df=df, obs=obs, rep=5, output=output_path,
                             set_up_start='1997-01-01 00:00:00', set_up_end='1999-12-31 23:00:00',
-                            sim_start='2000-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D",# soi=[5, 10],
+                            sim_start='2000-01-01 00:00:00', sim_end='2005-12-31 23:00:00', freq="D",# soi=[5, 10],
                             area_cat=315.694, area_glac=32.51, lat=42.33,
                             ele_dat=2550, ele_glac=4074, ele_cat=3225,
                             glacier_profile=glacier_profile,
                             parallel=False, algorithm='sceua', cores=20,
-                            dbname='matilda_par_smpl_test', dbformat='csv')
+                            dbname='matilda_par_smpl_test2', dbformat='csv')
+
+##>
+# Best parameter set:
+# lr_temp=-0.003529, lr_prec=0.001832, BETA=5.617, CET=0.2964, FC=473.5, K0=0.2966, K1=0.01198, K2=0.004498, LP=0.9346, MAXBAS=3.21, PERC=1.303, UZL=210.2, PCORR=0.91, TT_snow=-1.202, TT_diff=2.02, CFMAX_snow=3.676, CFMAX_rel=1.689, SFCF=0.6553, CWH=0.1782, AG=0.6494, RHO_snow=467.0
+# Run number 486 has the highest objectivefunction with: 0.7456
+
+##
+sampling_csv = output_path + '/matilda_par_smpl_test2.csv'
+param_dict = mspot.load_parameters(sampling_csv)      # From csv
+# param_dict = best_summary['best_param']             # From result dict
+
+output_MATILDA = matilda_simulation(df, obs=obs, #output=output_path,
+                                    set_up_start='1997-01-01 00:00:00', set_up_end='1999-12-31 23:00:00',
+                                    sim_start='2000-01-01 00:00:00', sim_end='2005-12-31 23:00:00', freq="D",
+                                    area_cat=315.694, area_glac=32.51, lat=42.33,
+                                    ele_dat=2550, ele_glac=4074, ele_cat=3225,
+                                    glacier_profile=glacier_profile, parameter_set=param_dict)
 
 
 
-# results = spotpy.analyser.load_csv_results('matilda_par_smpl_test')
-# sampling_csv = output_path + '/matilda_par_smpl_test.csv'
-# sampling_obs = output_path + '/matilda_par_smpl_test_observations.csv'
-#
-# results = mspot.analyze_results(sampling_csv, sampling_obs)
-# results['sampling_plot'].show()
-# results['best_run_plot'].show()
-# results['par_uncertain_plot'].show()
+
+# Irgendwie wird der parameter_df zwar gelesen aber KGE passt nicht. Wird der anders berechnet?
+
+
+
+
+
+
+
 
 # setup = mspot.spot_setup(set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
 #                             sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",# soi=[5, 10],
 #                             area_cat=315.694, area_glac=32.51, lat=42.33)
 #
 # psample_setup = setup(df, obs)  # Define objective function using obj_func=, otherwise KGE is used.
-#
 # sampler = spotpy.algorithms.rope(psample_setup, dbname="dbname", dbformat=None, parallel='mpi')
-#
 # sampler.sample(10)
 
-
-# best_summary['par_uncertain_plot'].show()
-# best_summary['best_run_plot'].show()
-# best_summary['sampling_plot'].show()
-#
-# best_param = pd.DataFrame(best_summary['best_param'], index=[0]).transpose()
-# best_param.to_csv(output_path + "best_param_85-89_sceau300.csv")
-#
-#
-# output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00', #output=output_path,
-#                                       sim_start='1985-01-01 00:00:00', sim_end='1987-12-31 23:00:00', freq="D",
-#                                       area_cat=315.694, area_glac=32.51, lat=42.33, warn=True, # soi=[5, 10],
-#                                       ele_dat=2550, ele_glac=4074, ele_cat=3225, parameter_df=best_param)
-
-# Irgendwie wird der parameter_df zwar gelesen aber nicht akzeptiert. KGE sollte 0.8555 betragen. Oder wird der anders berechnet?
-# Ergebnis von psample sollte direkt in MATILDA überführbar sein.
-
-
-# Glacier profile mit rein?!
-
-## Mit default parameters:
-
-# output_MATILDA = MATILDA.MATILDA_simulation(df, obs=obs,  output=output_path, set_up_start='1982-01-01 00:00:00', set_up_end='1984-12-31 23:00:00',
-#                                       sim_start='1985-01-01 00:00:00', sim_end='1989-12-31 23:00:00', freq="D",
-#                                       area_cat=315.694, area_glac=32.51, lat=42.33,# soi=[5, 10],
-#                                       ele_dat=2550, ele_glac=4074, ele_cat=3225)
-#
-# output_MATILDA[6].show()
 
 
 ## With glacier change
@@ -165,24 +156,3 @@ output_MATILDA[6].show()
 # Adapt when parametrization is set up:
 
 # dmod_score(bc_check['sdm'], bc_check['y_predict'], bc_check['x_predict'], ylabel="Temperature [C]")
-
-
-
-## Running MATILDA
-# parameter = MATILDA.MATILDA_parameter(df, set_up_start='1987-01-01 00:00:00', set_up_end='1988-12-31 23:00:00',
-#                                       sim_start='1992-01-01 00:00:00', sim_end='1995-07-30 23:00:00', freq="D",
-#                                       area_cat=315.694, area_glac=32.51, lat=42.33,
-#                                       ele_dat=2550, ele_glac=4074, ele_cat=3225, lr_temp=-0.005936, lr_prec=-0.0002503,
-#                                       TT_snow=0.354, TT_rain=0.5815, CFMAX_snow=4.824, CFMAX_ice=5.574, CFR_snow=0.08765,
-#                                       CFR_ice=0.01132, BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
-#                                       LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765)
-#
-# df_preproc, obs_preproc = MATILDA.MATILDA_preproc(df, parameter, obs=obs)
-# #
-# output_MATILDA = MATILDA.MATILDA_submodules(df_preproc, parameter, obs_preproc)
-# #
-# output_MATILDA = MATILDA.MATILDA_plots(output_MATILDA, parameter)
-# output_MATILDA[6].show()
-
-
-# MATILDA.MATILDA_save_output(output_MATILDA, parameter, output_path)
