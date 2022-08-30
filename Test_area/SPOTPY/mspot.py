@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import spotpy  # Load the SPOT package into your working storage
 from datetime import date, datetime
+import HydroErr as he
 from spotpy.parameter import Uniform
 from spotpy.objectivefunctions import nashsutcliffe, kge
 from spotpy import analyser  # Load the Plotting extension
@@ -161,7 +162,8 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
 
             if not self.obj_func:
                 # This is used if not overwritten by user
-                like = kge(evaluation_clean, simulation_clean)
+                # like = kge(evaluation_clean, simulation_clean)          # SPOTPY internal kge
+                like = he.kge_2012(simulation_clean, evaluation_clean, remove_zero=True)
             else:
                 # Way to ensure flexible spot setup class
                 like = self.obj_func(evaluation_clean, simulation_clean)
@@ -298,7 +300,7 @@ def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=
 
 def load_parameters(path):
     sampling_csv = path
-    sampling_obs = path.split('.')[0].split('/')[-1] + '_observations.csv'
+    sampling_obs = path.split('.')[0] + '_observations.csv'
     results = analyze_results(sampling_csv, sampling_obs)
 
     return results['best_param']

@@ -44,7 +44,6 @@ cmipT = load_cmip(input_path + cmip_path, 't2m_CMIP6_all_models_adjusted_42.516-
 cmipP = load_cmip(input_path + cmip_path, 'tp_CMIP6_all_models_adjusted_42.516-79.0167_1982-01-01-2100-12-31_')
 glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 
-
 # # Basic overview plot
 # obs_fig = obs.copy()
 # obs_fig.set_index('Date', inplace=True)
@@ -67,14 +66,8 @@ output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1998-01-01 00:00:
                                       K1=0.01198, K2=0.004498, LP=0.9346, MAXBAS=3.21, PERC=1.303, UZL=210.2,
                                       PCORR=0.91, TT_snow=-1.202, TT_diff=2.02, CFMAX_snow=3.676, CFMAX_rel=1.689,
                                       SFCF=0.6553, CWH=0.1782, AG=0.6494, RFS=0.2)
-
-
-
-
 output_MATILDA[7].show()
-
 plt.show()
-
 
 ## Run SPOTPY:
 
@@ -96,6 +89,7 @@ best_summary = mspot.psample(df=df, obs=obs, rep=5, output=output_path,
 sampling_csv = output_path + '/matilda_par_smpl_test2.csv'
 param_dict = mspot.load_parameters(sampling_csv)      # From csv
 # param_dict = best_summary['best_param']             # From result dict
+
 
 output_MATILDA = matilda_simulation(df, obs=obs, #output=output_path,
                                     set_up_start='1997-01-01 00:00:00', set_up_end='1999-12-31 23:00:00',
