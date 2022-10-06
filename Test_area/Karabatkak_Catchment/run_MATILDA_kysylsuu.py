@@ -57,8 +57,80 @@ glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 ##> Data from 1982-01-01 to 1989-12-31 [8y], 1992-01-01 to 2007-12-31 [16y], 2010-01-01 to 2014-12-31 [5y], 2017-05-04 to 2021-07-30 [4y]
 
 ##
+
+df_test = df[0:3652]
+df_test[731:3652]['RRR'] = df_test[731:3652]['RRR'].where(df_test[731:3652]['RRR'] <=  0, 0)
+
+output_MATILDA = matilda_simulation(df_test, obs=obs, set_up_start='1982-01-01', set_up_end='1983-12-31', #output=output_path,
+                                      sim_start='1983-01-01', sim_end='1991-12-31', freq="D", glacier_profile=glacier_profile,
+                                      area_cat=315.694, lat=42.33, warn=False, plot_type="all", plots=True,
+                                      ele_dat=2550, ele_cat=3225, area_glac=32.51, ele_glac=4074,
+
+                                      lr_temp=-0.003529, lr_prec=0.001832, BETA=5.617, CET=0.2964, FC=473.5, K0=0.2966,
+                                      K1=0.01198, K2=0.004498, LP=0.9346, MAXBAS=3.21, PERC=1.303, UZL=210.2,
+                                      PCORR=0.91, TT_snow=-1.202, TT_diff=2.02, CFMAX_snow=3.676, CFMAX_rel=1.689,
+                                      SFCF=0.6553, CWH=0.1782, AG=0.6494, RFS=0.2)
+output_MATILDA[7].show()
+
+plt.show()
+
+##
+df_test = df[0:3650]
+df_test.TIMESTAMP = pd.to_datetime(df_test.TIMESTAMP)
+df_test = df_test.set_index('TIMESTAMP')
+Prec = df_test['RRR']
+PERC=1.303
+UZL=210.2
+K0=0.2966
+K1=0.01198
+K2=0.004498
+
+# soil upper zone box
+SUZ = np.zeros(len(Prec))
+SUZ[0] = 0.0001
+# soil lower zone box
+SLZ = np.zeros(len(Prec))
+SLZ[0] = 0.0001
+# simulated runoff box
+Qsim = np.zeros(len(Prec))
+Qsim[0] = 0.0001
+
+for t in range(1, len(Prec)):
+    SUZ[t] = SUZ[t - 1] + Prec[t]
+    # percolation control
+    perc = min(SUZ[t], PERC)
+    # update upper groundwater box
+    SUZ[t] = SUZ[t] - perc
+    # runoff from the highest part of upper groundwater box (surface runoff)
+    Q0 = K0 * max(SUZ[t] - UZL, 0)
+    # update upper groundwater box
+    SUZ[t] = SUZ[t] - Q0
+    # runoff from the middle part of upper groundwater box
+    Q1 = K1 * SUZ[t]
+    # update upper groundwater box
+    SUZ[t] = SUZ[t] - Q1
+    # calculate lower groundwater box
+    SLZ[t] = SLZ[t - 1] + perc
+    # runoff from lower groundwater box
+    Q2 = K2 * SLZ[t]
+    # update lower groundwater box
+    SLZ[t] = SLZ[t] - Q2
+
+    # Total runoff calculation
+    Qsim[t] = Q0 + Q1 + Q2
+
+comp = pd.DataFrame({'prec':Prec, 'Qsim':Qsim})
+comp = comp.resample('Y').sum()
+comp['diff'] = comp['prec']-comp['Qsim']
+print(Prec.sum())
+print(Qsim.sum())
+
+comp.plot()
+# comp['diff'].plot()
+plt.show()
+##
 output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1998-01-01 00:00:00', set_up_end='1999-12-31 23:00:00', #output=output_path,
-                                      sim_start='2000-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D", glacier_profile=glacier_profile,
+                                      sim_start='2000-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="3M", glacier_profile=glacier_profile,
                                       area_cat=315.694, area_glac=32.51, lat=42.33, warn=False, plot_type="all", plots=True,
                                       ele_dat=2550, ele_glac=4074, ele_cat=3225,
 
@@ -66,8 +138,13 @@ output_MATILDA = matilda_simulation(df, obs=obs, set_up_start='1998-01-01 00:00:
                                       K1=0.01198, K2=0.004498, LP=0.9346, MAXBAS=3.21, PERC=1.303, UZL=210.2,
                                       PCORR=0.91, TT_snow=-1.202, TT_diff=2.02, CFMAX_snow=3.676, CFMAX_rel=1.689,
                                       SFCF=0.6553, CWH=0.1782, AG=0.6494, RFS=0.2)
-output_MATILDA[7].show()
+output_MATILDA[9].show()
 plt.show()
+
+
+
+output_MATILDA[1].sum()
+
 
 ## Run SPOTPY:
 
