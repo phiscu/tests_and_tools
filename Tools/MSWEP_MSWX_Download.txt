@@ -1,0 +1,10 @@
+rclone sync --drive-shared-with-me Google:/MSWX_V100/Past/P/Daily --include "2021*" /media/phillip/KALI_LIVE/GloH2O/MSWX/past
+
+--> Download year 2021 of daily MSWX past precipitation data
+
+rclone sync --drive-shared-with-me Google:/MSWX_V100/Past/P/Daily --include "{1979,1980,1981,1982,1983,1984,1985,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015}*" /media/phillip/KALI_LIVE/GloH2O/MSWX/past
+
+--> Download multiple years
+
+MSWX: https://drive.google.com/drive/folders/1R1KRmldXmLj_09kzE2wKSrbXUzU3pQN9
+MSWEP: https://drive.google.com/drive/folders/1Kok05OPVESTpyyan7NafR-2WwuSJ4TO9
