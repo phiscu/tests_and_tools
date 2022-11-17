@@ -45,8 +45,8 @@ def yesno(question):
 def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
                area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi = None, glacier_profile=None,
                elev_rescaling=True,
-            lr_temp_lo=-0.01, lr_temp_up=-0.003,
-            lr_prec_lo=0, lr_prec_up=0.002,
+            lr_temp_lo=-0.01, lr_temp_up=-0.003,        # ???
+            lr_prec_lo=0, lr_prec_up=0.002,             # ???
             BETA_lo=1, BETA_up=6,
             CET_lo=0, CET_up=0.3,
             FC_lo=50, FC_up=500,
@@ -57,15 +57,15 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             MAXBAS_lo=2,  MAXBAS_up=7,
             PERC_lo=0, PERC_up=3,
             UZL_lo=0, UZL_up=500,
-            PCORR_lo=0.5, PCORR_up=2,
-            TT_snow_lo=-1.5, TT_snow_up=2.5,
-            TT_diff_lo=0.2, TT_diff_up=4,
-            CFMAX_snow_lo=1, CFMAX_snow_up=5,
-            CFMAX_rel_lo=1.2, CFMAX_rel_up=2.5,
-            SFCF_lo=0.4, SFCF_up=1,
+            PCORR_lo=0.5, PCORR_up=2,                   # ???
+            TT_snow_lo=-1.5, TT_snow_up=2.5,            # ???
+            TT_diff_lo=0.2, TT_diff_up=4,               # ???
+            CFMAX_snow_lo=1, CFMAX_snow_up=5,           # X
+            CFMAX_rel_lo=1.2, CFMAX_rel_up=2.5,         # X
+            SFCF_lo=0.4, SFCF_up=1,                     # X
             CWH_lo=0, CWH_up=0.2,
             AG_lo=0, AG_up=1,
-            RFS_lo=0.05, RFS_up=0.25,
+            RFS_lo=0.05, RFS_up=0.25,                   # X
 
             interf=4, freqst=2):
 

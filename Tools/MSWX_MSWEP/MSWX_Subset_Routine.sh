@@ -1,10 +1,10 @@
 #!/bin/bash
 # longitude_range=75.80,76.40
 # latitude_range=41.00,41.40
-longitude_range=78.00,78.40
-latitude_range=42.00,42.40
+longitude_range=77.90,78.50
+latitude_range=41.90,42.50
 
-input_folder=/media/phillip/KALI_LIVE/GloH2O/MSWX/past/Temp #/home/phillip/Seafile/EBA-CA/Tianshan_data/GloH2O/MSWEP/raw		
+input_folder=/home/phillip/Seafile/EBA-CA/Tianshan_data/GloH2O/MSWX/past/Daily #/data/projects/ebaca/Tienshan_data/GloH2O/MSWX/past 		
 dataset_name=MSWX_Temp_daily_past
 start_y=1979
 end_y=2022

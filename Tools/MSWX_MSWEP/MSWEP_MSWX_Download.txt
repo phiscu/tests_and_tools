@@ -8,3 +8,8 @@ rclone sync --drive-shared-with-me Google:/MSWX_V100/Past/P/Daily --include "{19
 
 MSWX: https://drive.google.com/drive/folders/1R1KRmldXmLj_09kzE2wKSrbXUzU3pQN9
 MSWEP: https://drive.google.com/drive/folders/1Kok05OPVESTpyyan7NafR-2WwuSJ4TO9
+
+
+# Cirrus:
+
+nohup rclone sync --drive-shared-with-me GoogleDrive:/MSWX_V100/Past/RelHum/Daily /data/projects/ebaca/Tienshan_data/GloH2O/MSWX/past/RelHum --fast-list &

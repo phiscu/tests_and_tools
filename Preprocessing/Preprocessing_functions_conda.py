@@ -12,14 +12,15 @@ else:
     home = str(Path.home()) + '/Seafile'
 import matplotlib.pyplot as plt
 import xagg
+import xarray
 
 ## Area-weighted catcment-wide mean:
 
-def weighted_avg(xarray, shape, return_clip=False, plot=False):
-    """Area-weighted average of xarray cells overlapping a polygon."""
+def weighted_avg(array, shape, return_clip=False, plot=False):
+    """Area-weighted average of array cells overlapping a polygon."""
 
     # Clip to overlapping grid cells (for plotting):
-    clip = xarray.salem.roi(shape=shape, all_touched=True)
+    clip = array.salem.roi(shape=shape, all_touched=True)
     # Calculate overlaps:
     weightmap = xagg.pixel_overlaps(clip, shape)
     # Aggregate
@@ -32,7 +33,10 @@ def weighted_avg(xarray, shape, return_clip=False, plot=False):
             fig = plt.figure(figsize=(16, 12), dpi=300)
             ax = fig.add_subplot(111)
             shape.plot(ax=ax, zorder=3)
-            xarray[list(clip.keys())[0]].mean(dim='time').plot(ax=ax, zorder=-1)
+            if isinstance(clip, xarray.DataArray):
+                clip.mean(dim='time').plot(ax=ax, zorder=-1)
+            else:
+                clip[list(clip.keys())[0]].mean(dim='time').plot(ax=ax, zorder=-1)
             # plt.text(aws_lon, aws_lat, 'AWS')
             # plt.scatter(aws_lon, aws_lat, color='r')
             return df, clip, fig
@@ -43,7 +47,10 @@ def weighted_avg(xarray, shape, return_clip=False, plot=False):
             fig = plt.figure(figsize=(16, 12), dpi=300)
             ax = fig.add_subplot(111)
             shape.plot(ax=ax, zorder=3)
-            xarray[list(clip.keys())[0]].mean(dim='time').plot(ax=ax, zorder=-1)
+            if isinstance(clip, xarray.DataArray):
+                clip.mean(dim='time').plot(ax=ax, zorder=-1)
+            else:
+                clip[list(clip.keys())[0]].mean(dim='time').plot(ax=ax, zorder=-1)
             # plt.text(aws_lon, aws_lat, 'AWS')
             # plt.scatter(aws_lon, aws_lat, color='r')
             return df, fig

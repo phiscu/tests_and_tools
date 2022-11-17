@@ -3,16 +3,17 @@ import cdsapi
 c = cdsapi.Client()
 
 c.retrieve(
-    'reanalysis-era5-single-levels',
+    'reanalysis-era5-land',
     {
-        'product_type':'reanalysis',
-        'format':'grib',
+        'format':'netcdf',
         'variable':[
-            'surface_pressure'
+            'LONG_NAME'
         ],
-	'area'		: [31.00, 81.00, 30.00, 82.00],
+	'area': [
+	    42.4, 78, 42,
+	    78.4],
         'year':[
-            '2019'
+            'YYYY'
         ],
         'month':[
             '01','02','03',
@@ -44,4 +45,4 @@ c.retrieve(
             '21:00','22:00','23:00'
         ]
     },
-    '/data/projects/prime-SG/io/Halji/ERA5/grib/sp/Halji_ERA5_sp_2019.grib')
+    '/home/phillip/Seafile/Ana-Lena_Phillip/data/input_output/input/ERA5/Tien-Shan/Kysylsuu/CDC_Download/NAME/Kyzylsuu_ERA5_NAME_YYYY.ncdf')

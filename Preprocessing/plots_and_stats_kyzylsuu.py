@@ -15,7 +15,7 @@ elif 'cirrus' in host:
     home = '/data/projects/ebaca'
 else:
     home = str(Path.home()) + '/Seafile'
-wd = home + '/Ana-Lena_Phillip/data/matilda/Preprocessing'
+wd = home + '/Ana-Lena_Phillip/data/tests_and_tools/Preprocessing'
 os.chdir(wd + '/Downscaling')
 sys.path.append(wd)
 from Preprocessing_functions import dmod_score, df2long, cmip_plot_ensemble
