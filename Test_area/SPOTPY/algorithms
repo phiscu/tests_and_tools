@@ -1,0 +1,29 @@
+abc	- maximize
+
+dds	- maximize
+
+demcz	- maximize
+
+dream	- maximize
+
+fast	- both
+
+fscabc	- maximize
+
+lhs	- both		- multi-obj?
+
+mc	- both
+
+mcmc	- maximize
+
+mle	- maximize
+
+nsgaii	- minimize	- multi-obj
+
+padds	- minimize	- multi-obj
+
+rope	- maximize
+
+sa	- maximize
+
+sceua	- minimize

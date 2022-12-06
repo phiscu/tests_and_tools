@@ -23,10 +23,7 @@ from Preprocessing_functions_conda import weighted_avg
 
 ## Paths:
 era_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/era5l'
-
-msw_path = home + '/EBA-CA/Tianshan_data/GloH2O'
-mswx_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/mswx/'
-
+mswx_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/mswx'
 har_path = home + '/EBA-CA/Tianshan_data/HARv2/variables/all_variables_HARv2_daily_kyzylsuu_1980_2020.nc'
 obs_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu'
 static_har_path = home + "/EBA-CA/Tianshan_data/HARv2/static/all_static_kyzylsuu_HARv2.nc"
@@ -36,12 +33,10 @@ catchment_path = home + "/Ana-Lena_Phillip/data/input_output/input/observations/
 ## Preprocessing:
 
 # MSWX:
-mswx_p = salem.open_xr_dataset(msw_path + '/MSWX/MSWX_P_daily_past_kyzylsuu_1979_2022.nc')
-mswx_t = salem.open_xr_dataset(msw_path + '/MSWX/MSWX_Temp_daily_past_kyzylsuu_1979_2022.nc')
+mswx_p = salem.open_xr_dataset(mswx_path + '/P_MSWX_daily_kyzylsuu_19792022.nc')
+mswx_t = salem.open_xr_dataset(mswx_path + '/Temp_MSWX_daily_kyzylsuu_19792022.nc')
 mswx_t = mswx_t + 273.15
-
-mswx_pev = salem.open_xr_dataset(mswx_path + 'PEV_fao56_MSWX_daily_kyzylsuu_1980-2022.nc')
-
+mswx_pev = salem.open_xr_dataset(mswx_path + '/PEV_fao56_MSWX_daily_kyzylsuu_1980-2022.nc')
 
 # HARv2:
 har_ds = salem.open_wrf_dataset(har_path)
@@ -51,13 +46,17 @@ har_p = har_ds.prcp
 har_t = har_ds.t2
 
 # ERA5L:
-era_ds = salem.open_xr_dataset(era_path + '/t2m_tp_Kysylsuu_ERA5L_1982_2021.nc')
+era_ds = salem.open_xr_dataset(era_path + '/t2m_tp_pev_Kysylsuu_ERA5L_1982_2021.nc')
 era_t = era_ds.t2m
 era_p = era_ds.tp
+era_pev = era_ds.pev
 
 era_p = era_p.isel(time=era_p.time.dt.hour == 0) * 1000       # ERA5L saves cumulative values since 00h. Values at 00h represent the daily sum of the previous day. From m to mm.
-era_p = era_p.shift(time=1, fill_value=0)               # Shift data to assign correct dates to daily sums. Fill day 1 with 0 (need previous day!).
+era_p = era_p.shift(time=-1, fill_value=0)               # Data starts at 00h and ends at 23h --> Shift data to assign correct dates to daily sums. Fill last day with 0 (need additional day!).
 era_p = era_p.where(era_p >= 0, 0)
+era_pev = era_pev.isel(time=era_pev.time.dt.hour == 0) * 1000   # Same applies for PEV...
+era_pev = era_pev.shift(time=-1, fill_value=0)
+era_pev = era_pev.where(era_pev >= 0, 0)
 era_t = era_t.resample(time="D").mean(dim='time')                   # Daily temperature means. BOTTLENECK!!!
     # see: https://confluence.ecmwf.int/display/CUSF/Total+Precipitation+%5BValues+not+in+range%5D+-+ERA5-Land+hourly+data+from+1981+to+present
 
@@ -140,6 +139,10 @@ df_p = pd.concat([mswx_p_cat, har_p_cat, era_p_cat], axis=1, join='inner')
 df_p.columns = ['mswx','har','era']
 # df_p = df_p.resample('Y').sum()
 
+## Write to files
+# df_t.to_csv(home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/temp_cat_agg_era5l_harv2_mswx_1982-2020.csv')
+# df_p.to_csv(home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/prec_cat_agg_era5l_harv2_mswx_1982-2020.csv')
+
 ## Stats
 
 print(df_t.mean())
@@ -153,18 +156,6 @@ print('HAR: ' + str(har_p_cat[har_p_cat!=0].isna().sum()))
 print('ERA: ' + str(era_p_cat[era_p_cat!=0].isna().sum()))
 print('MSWX: ' + str(mswx_p_cat[mswx_p_cat!=0].isna().sum()))
 
-## Plot and compare:
-
-df_p.plot()
-obs_met.tp.resample('Y').sum().plot()
-obs_met2.prec.resample('Y').sum().plot()
-plt.legend()
-plt.show()
-
-df_t.plot()
-obs_met.t2m.resample('Y').mean().plot()
-plt.legend()
-plt.show()
 
 ## Compare AWS period:
 
@@ -197,7 +188,7 @@ mswx_closest = mswx_p.precipitation.sel(lon=aws_lon, lat=aws_lat, method='neares
 
 summer_p_closest = pd.concat([mswx_closest, har_closest, era_closest], axis=1)[period_p]
 summer_p_closest = pd.concat([summer_p_closest, obs_met.tp[period_p]], axis=1)
-summer_p_closest = summer_p_closest[summer_p_closest.index.month.isin(range(4, 9))]
+summer_p_closest = summer_p_closest[summer_p_closest.index.month.isin(range(4, 10))]
 summer_p_closest.columns = ['mswx', 'har', 'era', 'aws']
 
 print(summer_p_closest.sum())
@@ -219,7 +210,7 @@ mswx_clos_elev = mswx_p.precipitation.sel(lon=closest_era_lon, lat=closest_era_l
 
 summer_p_clos_elev = pd.concat([mswx_clos_elev, har_clos_elev, era_clos_elev], axis=1)[period_p]
 summer_p_clos_elev = pd.concat([summer_p_clos_elev, obs_met.tp[period_p]], axis=1)
-summer_p_clos_elev = summer_p_clos_elev[summer_p_clos_elev.index.month.isin(range(4, 9))]
+summer_p_clos_elev = summer_p_clos_elev[summer_p_clos_elev.index.month.isin(range(4, 10))]
 summer_p_clos_elev.columns = ['mswx', 'har', 'era', 'aws']
 
 print(summer_p_clos_elev.sum())
@@ -232,6 +223,8 @@ pcorrs.columns = ['mswx', 'har', 'era', 'aws']
 pcorrs.replace([np.inf, -np.inf], np.nan, inplace=True)
 print(pcorrs.columns)
 print([pcorrs[i].dropna().mean() for i in pcorrs.columns])
+print([pcorrs[i].dropna().std() for i in pcorrs.columns])
+
 
 # Elevation:
 summer_mon = summer_p_clos_elev.resample('M').sum()
@@ -243,14 +236,17 @@ print([pcorrs[i].dropna().mean() for i in pcorrs.columns])
 
 
 # Results link the relation of a single grid cell and one weather station with the whole catchment...
+# --> HAR wird gedrittelt, Era nur halbiert obwohl era im Gesamtcatchment viel mehr NS hat
 # --> Try different PCORRS (average and closest) and take the best
+# OR
+# --> Just take proximity because HAR can't be increased even more!
 
 ## REMARKS:
 
 # ADAPTING THE ERA5 GRID TO FIT MSWX REDUCES THE AVERAGE TEMPERATURE BY ~2k AND THE MEAN ALTITUDE BY 115m
 # --> IS THE TRANSFORMATION OF HAR DATA CHANGING THE VALUES IN SIMILAR MANNER?
 
-# ele_dat=2550, ele_cat=3225 --> Average altitude ERA5L: 3273m (diff: 723m -> 4.34K), Average altitude HARv2: 3172m (diff: 621m -> 3,73K)
+# ele_dat=2550, ele_cat=3225 --> Average altitude ERA5L: 3273m (diff: 712m -> 4.34K), Average altitude HARv2: 3172m (diff: 611m -> 3,73K)
 # Mean temps:
 # mswx    269.972291 + 4.34?? = 274.312
 # har     271.072891 + 3.73   = 274.803
@@ -288,3 +284,10 @@ print([pcorrs[i].dropna().mean() for i in pcorrs.columns])
 # all datasets have far more precipitation events than obs, ERA5 is far off
 
 # The spatial precipitation distribution is completely different in HARv2 vs ERA5/MSWEP/MSWX
+
+
+## Load parameter from GloH2O
+params = salem.open_xr_dataset(home + '/EBA-CA/Tianshan_data/GloH2O/HBV/HBV_params_gloh2o_kyzylsuu.nc')
+params_cat = weighted_avg(params, catchment, return_clip=False)
+params_cat.to_csv(home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/hyd/'
+                         'HBV_params_gloh2o_kyzylsuu_cat_agg.csv')

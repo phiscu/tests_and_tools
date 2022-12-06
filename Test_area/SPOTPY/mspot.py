@@ -60,7 +60,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             PCORR_lo=0.5, PCORR_up=2,
             TT_snow_lo=-1.5, TT_snow_up=2.5,
             TT_diff_lo=0.2, TT_diff_up=4,
-            CFMAX_snow_lo=1, CFMAX_snow_up=5,
+            CFMAX_ice_lo=1.2, CFMAX_ice_up=12,
             CFMAX_rel_lo=1.2, CFMAX_rel_up=2.5,
             SFCF_lo=0.4, SFCF_up=1,
             CWH_lo=0, CWH_up=0.2,
@@ -72,7 +72,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
     class spot_setup:
         # defining all parameters and the distribution
         param = lr_temp, lr_prec, BETA, CET, FC, K0, K1, K2, LP, MAXBAS, PERC, UZL, PCORR, \
-                TT_snow, TT_diff, CFMAX_snow, CFMAX_rel, SFCF, CWH, AG, RFS = [
+                TT_snow, TT_diff, CFMAX_ice, CFMAX_rel, SFCF, CWH, AG, RFS = [
             Uniform(low=lr_temp_lo, high=lr_temp_up),  # lr_temp
             Uniform(low=lr_prec_lo, high=lr_prec_up),  # lr_prec
             Uniform(low=BETA_lo, high=BETA_up),  # BETA
@@ -88,7 +88,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             Uniform(low=PCORR_lo, high=PCORR_up),  # PCORR
             Uniform(low=TT_snow_lo, high=TT_snow_up),  # TT_snow
             Uniform(low=TT_diff_lo, high=TT_diff_up),  # TT_diff
-            Uniform(low=CFMAX_snow_lo, high=CFMAX_snow_up), # CFMAX_snow
+            Uniform(low=CFMAX_ice_lo, high=CFMAX_ice_up), # CFMAX_ice
             Uniform(low=CFMAX_rel_lo, high=CFMAX_rel_up),  # CFMAX_rel
             Uniform(low=SFCF_lo, high=SFCF_up),  # SFCF
             Uniform(low=CWH_lo, high=CWH_up),  # CWH
@@ -120,7 +120,7 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
                                                  lr_temp=x.lr_temp, lr_prec=x.lr_prec,
                                                  BETA=x.BETA, CET=x.CET, FC=x.FC, K0=x.K0, K1=x.K1, K2=x.K2, LP=x.LP,
                                                  MAXBAS=x.MAXBAS, PERC=x.PERC, UZL=x.UZL, PCORR=x.PCORR,
-                                                 TT_snow=x.TT_snow, TT_diff=x.TT_diff, CFMAX_snow=x.CFMAX_snow,
+                                                 TT_snow=x.TT_snow, TT_diff=x.TT_diff, CFMAX_ice=x.CFMAX_ice,
                                                  CFMAX_rel=x.CFMAX_rel, SFCF=x.SFCF, CWH=x.CWH, AG=x.AG, RFS=x.RFS)
 
             # return sim[366:]  # excludes the first year as a spinup period
@@ -158,8 +158,8 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             sim_new['obs'] = evaluation
             clean = sim_new.dropna()
 
-            simulation_clean = clean['obs']
-            evaluation_clean = clean['mod']
+            simulation_clean = clean['mod']
+            evaluation_clean = clean['obs']
 
             if not self.obj_func:
                 # This is used if not overwritten by user
