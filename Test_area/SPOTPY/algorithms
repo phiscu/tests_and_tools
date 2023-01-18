@@ -6,13 +6,13 @@ demcz	- maximize
 
 dream	- maximize
 
-fast	- both
+fast	- both		- multi-obj
 
 fscabc	- maximize
 
-lhs	- both		- multi-obj?
+lhs	- both		- multi-obj
 
-mc	- both
+mc	- both		- multi-obj
 
 mcmc	- maximize
 

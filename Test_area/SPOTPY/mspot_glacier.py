@@ -44,7 +44,7 @@ def yesno(question):
 
 def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
                area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi = None, glacier_profile=None,
-               elev_rescaling=True,
+               elev_rescaling=True, target_mb = None,
             lr_temp_lo=-0.01, lr_temp_up=-0.003,
             lr_prec_lo=0, lr_prec_up=0.002,
             BETA_lo=1, BETA_up=6,
@@ -122,9 +122,10 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
                                                  MAXBAS=x.MAXBAS, PERC=x.PERC, UZL=x.UZL, PCORR=x.PCORR,
                                                  TT_snow=x.TT_snow, TT_diff=x.TT_diff, CFMAX_ice=x.CFMAX_ice,
                                                  CFMAX_rel=x.CFMAX_rel, SFCF=x.SFCF, CWH=x.CWH, AG=x.AG, RFS=x.RFS)
-
-            # return sim[366:]  # excludes the first year as a spinup period
-            return sim[0].total_runoff
+            if target_mb is None:
+                return sim[0].total_runoff
+            else:
+                return [sim[0].total_runoff, sim[5].smb_water_year.mean()]
 
         def evaluation(self):
             obs_preproc = self.obs.copy()
@@ -146,11 +147,18 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
             obs_preproc = obs_preproc.reindex(idx)
             obs_preproc = obs_preproc.fillna(np.NaN)
 
-            return obs_preproc.Qobs
+            if target_mb is None:
+                return obs_preproc.Qobs
+            else:
+                return [obs_preproc.Qobs, target_mb]
 
         def objectivefunction(self, simulation, evaluation, params=None):
             # SPOTPY expects to get one or multiple values back,
             # that define the performance of the model run
+            if target_mb is not None:
+                obj2 = abs(evaluation[1] - simulation[1])
+                simulation = simulation[0]
+                evaluation = evaluation[0]
 
             # Crop both timeseries to same periods without NAs
             sim_new = pd.DataFrame()
@@ -163,18 +171,22 @@ def spot_setup(set_up_start=None, set_up_end=None, sim_start=None, sim_end=None,
 
             if not self.obj_func:
                 # This is used if not overwritten by user
-                # like = kge(evaluation_clean, simulation_clean)          # SPOTPY internal kge
-                like = he.kge_2012(simulation_clean, evaluation_clean, remove_zero=True)
+                # obj1 = kge(evaluation_clean, simulation_clean)          # SPOTPY internal kge
+                obj1 = he.kge_2012(simulation_clean, evaluation_clean, remove_zero=True) # same as MATILDA
             else:
                 # Way to ensure flexible spot setup class
-                like = self.obj_func(evaluation_clean, simulation_clean)
-            return like
+                obj1 = self.obj_func(evaluation_clean, simulation_clean)
+
+            if target_mb is None:
+                return obj1
+            else:
+                return [obj1, obj2]
 
     return spot_setup
 
 
 
-##
+
 def winter(year, data):
     data = data[data.index == year]
     winter = slice(data.BEGIN_PERIOD.squeeze(), data.END_WINTER.squeeze())
@@ -305,7 +317,8 @@ def spot_setup_glacier(set_up_start=None, set_up_end=None, sim_start=None, sim_e
 
 
 
-def analyze_results(sampling_data, obs, algorithm, obj_dir="maximize", fig_path = None, dbname='mspot_results', glacier_only=False):
+def analyze_results(sampling_data, obs, algorithm, obj_dir="maximize", fig_path = None, dbname='mspot_results',
+                    glacier_only=False, target_mb=None):
 
     if isinstance(obs, str):
         if glacier_only:
@@ -351,6 +364,13 @@ def analyze_results(sampling_data, obs, algorithm, obj_dir="maximize", fig_path 
         bestindex, bestobjf = spotpy.analyser.get_minlikeindex(results)  # Run with lowest MAE
         best_model_run = results[bestindex]
 
+    elif target_mb is not None:
+        if obj_dir == "minimize":
+            bestindex, bestobjf = spotpy.analyser.get_minlikeindex(results)
+        else:
+            bestindex, bestobjf = spotpy.analyser.get_maxlikeindex(results)
+        best_model_run = results[bestindex]
+
     else:
         sim_start = obs.index[0]
         sim_end = obs.index[-1]
@@ -360,7 +380,7 @@ def analyze_results(sampling_data, obs, algorithm, obj_dir="maximize", fig_path 
         best_simulation = pd.Series(list(list(best_model_run[fields])[0]), index=pd.date_range(sim_start, sim_end))
         # Only necessary because obs has a datetime. Thus, both need a datetime.
         
-    if not glacier_only:
+    if not glacier_only and target_mb is None:
         fig1 = plt.figure(1, figsize=(9, 5))
         plt.plot(results['like1'])
         plt.ylabel('KGE')
@@ -408,7 +428,7 @@ def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=
             set_up_start=None, set_up_end=None, sim_start=None, sim_end=None, freq="D", lat=None, area_cat=None,
             area_glac=None, ele_dat=None, ele_glac=None, ele_cat=None, soi=None, glacier_profile=None,
             interf=4, freqst=2, parallel=False, cores=2, save_sim=True, elev_rescaling=True,
-            glacier_only=False, obs_type="annual",
+            glacier_only=False, obs_type="annual", target_mb=None,
             algorithm='sceua', obj_dir="maximize", **kwargs):
 
     cwd = os.getcwd()
@@ -428,7 +448,7 @@ def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=
         setup = spot_setup(set_up_start=set_up_start, set_up_end=set_up_end, sim_start=sim_start, sim_end=sim_end,
                         freq=freq, area_cat=area_cat, area_glac=area_glac, ele_dat=ele_dat, ele_glac=ele_glac,
                         ele_cat=ele_cat, lat=lat, soi=soi, interf=interf, freqst=freqst, glacier_profile=glacier_profile,
-                        elev_rescaling=elev_rescaling,
+                        elev_rescaling=elev_rescaling, target_mb=target_mb,
                         **kwargs)
 
     psample_setup = setup(df, obs, obj_func)  # Define custom objective function using obj_func=
@@ -440,9 +460,12 @@ def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=
                     'rope': spotpy.algorithms.rope, 'fast': spotpy.algorithms.fast,
                     'nsgaii': spotpy.algorithms.nsgaii}
 
+    if target_mb is not None:           # Format errors in database csv when saving simulations
+        save_sim = False
+
     if parallel:
         sampler = alg_selector[algorithm](psample_setup, dbname=dbname, dbformat=dbformat, parallel='mpi',
-                                          optimization_direction=obj_dir, save_sim=save_sim)
+                                              optimization_direction=obj_dir, save_sim=save_sim)
         if algorithm == 'mc' or algorithm == 'lhs' or algorithm == 'fast' or algorithm == 'rope':
             sampler.sample(rep)
         elif algorithm == 'sceua':
@@ -467,12 +490,20 @@ def psample(df, obs, rep=10, output = None, dbname='matilda_par_smpl', dbformat=
 
     # Change dbformat to None for short tests but to 'csv' or 'sql' to avoid data loss in case off long calculations.
 
-    psample_setup.evaluation().to_csv(dbname + '_observations.csv')
+    if target_mb is None:
+        psample_setup.evaluation().to_csv(dbname + '_observations.csv')
+    else:
+        psample_setup.evaluation()[0].to_csv(dbname + '_observations.csv')
+
 
     if not parallel:
 
-        results = analyze_results(sampler, psample_setup.evaluation(), algorithm=algorithm, obj_dir=obj_dir,
+        if target_mb is None:
+            results = analyze_results(sampler, psample_setup.evaluation(), algorithm=algorithm, obj_dir=obj_dir,
                                   fig_path=fig_path, dbname=dbname, glacier_only=glacier_only)
+        else:
+            results = analyze_results(sampler, psample_setup.evaluation()[0], algorithm=algorithm, obj_dir=obj_dir,
+                                  fig_path=fig_path, dbname=dbname, glacier_only=glacier_only, target_mb=target_mb)
 
         return results
 

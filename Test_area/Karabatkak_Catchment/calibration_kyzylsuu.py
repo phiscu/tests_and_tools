@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 
-## import of necessary packages
+## import
 import os
 import pandas as pd
 from pathlib import Path
@@ -37,7 +37,7 @@ har_path = home + '/EBA-CA/Tianshan_data/HARv2/variables/all_variables_HARv2_dai
 
 t2m_agg_path = '/met/temp_cat_agg_era5l_harv2_mswx_1982-2020.csv'
 tp_agg_path = '/met/prec_cat_agg_era5l_harv2_mswx_1982-2020.csv'
-runoff_obs = "/hyd/obs/Kyzylsuu_1982_2021_latest.csv"
+runoff_obs = "/hyd/obs/Kyzylsuu_1982_2020_latest.csv"
 cmip_path = '/met/cmip6/'
 cal_path = '/validation/Compact/Kyzylsuu/'
 
@@ -214,7 +214,7 @@ mb_ann_matilda = mb_ann.reset_index()
 # Pass parameter bounds from step 1 and 2 as dict:
 # lim_dict = {'lr_temp_lo': lr_temp_lo, 'lr_temp_up': lr_temp_up, 'PCORR_lo': PCORR_lo_mswx, 'PCORR_up': PCORR_up_mswx}
 #
-# best_summary = mspot_glacier.psample(df=df_mswx, obs=mb_obs, rep=10, output=output_path + '/glacier_only',
+# best_summary = mspot_glacier.psample(df=df_mswx, obs=mb_obs, rep=6, output=output_path + '/glacier_only',
 #                                      set_up_start='1997-01-01', set_up_end='1999-12-31',
 #                                      sim_start='2000-01-01', sim_end='2020-12-31', freq="D",
 #                                      glacier_profile=glacier_profile_karab, area_cat=karab_area, lat=42.33,
@@ -238,6 +238,8 @@ mb_ann_matilda = mb_ann.reset_index()
 # param_dict = {"lr_temp": -0.00604341, "lr_prec": 0.00199707, "PCORR": 1.45612, "TT_snow": 0.880102, "TT_diff": 0.571304, "CFMAX_ice": 1.82167, "CFMAX_rel": 1.20094, "SFCF": 0.971164, "RFS": 0.050841}
 # --> annual MB -0.01 m
 # --> winter MAE: 55.6 mm
+
+# --> lr_temp_lo_up, PCORR + SD, CFMAX_ice = 6, SCEUA, 10k
 
 ## Step 4 - Calibrate melt rates on Karabatkak annual (or summer) balance
 
@@ -265,24 +267,23 @@ mb_ann_matilda = mb_ann.reset_index()
 
 ## Parameters sets - step 4:
 # Fixed parameters:
-# param_dict = {"lr_temp": -0.00604341, "lr_prec": 0.00199707, "PCORR": 1.45612, "TT_snow": 0.880102, "TT_diff": 0.571304, "CFMAX_ice": 5.2711, "CFMAX_rel": 1.77628, "SFCF": 0.971164, "RFS": 0.147832}
-
-# --> annual MB -0.85 m
-# --> winter MAE: 109.6 mm
-# --> summer MAE: 203.7 mm
-# --> annual MAE: 288.9 mm
-
 # Best 5% as bounds - BEST CHOICE!:
-param_dict = {"lr_temp": -0.00615121, "lr_prec": 0.00198416, "PCORR": 1.46401, "TT_snow": 0.901088, "TT_diff": 0.570674, "CFMAX_ice": 5.25168, "CFMAX_rel": 1.7523, "SFCF": 0.969817, "RFS": 0.0832019}
+# param_dict = {"lr_temp": -0.00615121, "lr_prec": 0.00198416, "PCORR": 1.46401, "TT_snow": 0.901088, "TT_diff": 0.570674, "CFMAX_ice": 5.25168, "CFMAX_rel": 1.7523, "SFCF": 0.969817, "RFS": 0.0832019}
 
 # --> annual MB:  -0.85 m
 # --> winter MAE: 108 mm
 # --> summer MAE: 199.8 mm
 # --> annual MAE: 286.3 mm
 
+
+# param_dict = {"lr_temp": -0.00604341, "lr_prec": 0.00199707, "PCORR": 1.45612, "TT_snow": 0.880102, "TT_diff": 0.571304, "CFMAX_ice": 5.2711, "CFMAX_rel": 1.77628, "SFCF": 0.971164, "RFS": 0.147832}
+# --> annual MB -0.85 m
+# --> winter MAE: 109.6 mm
+# --> summer MAE: 203.7 mm
+# --> annual MAE: 288.9 mm
+
 # Best 1% as bounds:
 # param_dict = {"lr_temp": -0.00611364, "lr_prec": 0.00199376, "PCORR": 1.4562, "TT_snow": 0.905665, "TT_diff": 0.56885, "CFMAX_ice": 5.16905, "CFMAX_rel": 1.70474, "SFCF": 0.969577, "RFS": 0.108975}
-
 # --> annual MB:  -0.86 m
 # --> winter MAE: 108.8 mm
 # --> summer MAE: 201.7 mm
@@ -290,7 +291,6 @@ param_dict = {"lr_temp": -0.00615121, "lr_prec": 0.00198416, "PCORR": 1.46401, "
 
 # Best 5% calibrated on annual MB:
 # param_dict = {"lr_temp": -0.00611322, "lr_prec": 0.00198087, "PCORR": 1.46418, "TT_snow": 0.834553, "TT_diff": 0.525529, "CFMAX_ice": 5.85729, "CFMAX_rel": 2.42333, "SFCF": 0.971802, "RFS": 0.209699}
-
 # --> annual MB:  -0.68 m
 # --> winter MAE: 115.8 mm
 # --> summer MAE: 262.7 mm
@@ -317,23 +317,42 @@ param_dict = {"lr_temp": -0.00615121, "lr_prec": 0.00198416, "PCORR": 1.46401, "
 #                                      dbname='mswx_glacier_only_step5_best5_summer_demcz')
 
 ## Parameters sets - step 5:
-# mswx_step5_best5_summer_demcz_6000:
+# mswx_step5_best5-summer_2000-2017_demcz_10000:
 
-param_dict = {"lr_temp": -0.00615, "lr_prec": 0.00198, "BETA": 1, "CET": 0.0713384, "FC": 50, "K0": 0.0103,
-              "K1": 0.0104, "K2": 0.127972, "LP": 1, "MAXBAS": 2.01244, "PERC": 0.00234, "UZL": 194.284,
-              "PCORR": 1.46, "TT_snow": 0.901, "TT_diff": 0.571, "CFMAX_ice": 5.25, "CFMAX_rel": 1.75, "SFCF": 0.97,
-              "CWH": 0.000194, "AG": 0.999, "RFS": 0.0832}
+param_dict = {"lr_temp": -0.00615, "lr_prec": 0.00198, "BETA": 1, "CET": 0.000176, "FC": 50.5, "K0": 0.20239,
+              "K1": 0.0101, "K2": 0.15, "LP": 1, "MAXBAS": 2.58113, "PERC": 0.00256, "UZL": 472.01, "PCORR": 1.46,
+              "TT_snow": 0.901, "TT_diff": 0.571, "CFMAX_ice": 5.25, "CFMAX_rel": 1.75, "SFCF": 0.97, "CWH": 0.109155,
+              "AG": 0.671963, "RFS": 0.0832}
+
+# --> Mean Annual MB (2000-2017): -0.24 m w.e.
+# KGE coefficient: 0.84 (monthly)
+# NSE coefficient: 0.77
+# RMSE: 23.9
+
 
 ## Check results:
 output_MATILDA = matilda_simulation(df_mswx, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
-                                    sim_start='2000-01-01', sim_end='2018-12-31', freq="M", glacier_profile=glacier_profile,
+                                    sim_start='2000-01-01', sim_end='2017-12-31', freq="M", glacier_profile=glacier_profile,
+                                    area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
+                                    ele_dat=3273, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                                    parameter_set=param_dict)
+
+print('Mean Annual MB (2000-2017): ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' m w.e.')
+
+# output_MATILDA[9].show()
+
+
+## Validation:
+
+output_MATILDA = matilda_simulation(df_mswx, obs=obs, set_up_start='2015-01-01', set_up_end='2017-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
+                                    sim_start='2018-01-01', sim_end='2019-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
                                     ele_dat=3273, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
                                     parameter_set=param_dict)
 
 print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' m w.e.')
 
-output_MATILDA[9].show()
+# --> Runoff data 2020 seems shifted by ~3 months! --> Far better when excluded.
 
 ##
 # # param_dict = best_summary['best_param']
@@ -394,10 +413,19 @@ print('Mean Annual MB (2000-2018): ' + str(round(glacier_change[glacier_change.t
 # ground measurements disagree with remote sensing results: mean annual MB -0.7 mwea not in range of -0.185 +- 0.139 mwea
 # --> remote sensing more exact because not point based? See final validation.
 
+# Validation:
+#   - Runoff in validation period (2018-2020)
+#   - 18y MB 2000-2018
+#   - Area changes
 
-# VERGISS NICHT EINEN ABFLUSSVALIDIERUNGSZEITRAUM ZU LASSEN!! zb 2018-07-30 bis 2021-07-30
+# Calibration:
+#   - winter MB 2014-2020
+#   - summer MB 2014-2020
+#   - Runoff 2000-2017
 
-
+# Other quality criteria:
+#   - Timing of peak runoff
+#   - start of melting season (runoff onset in spring)
 
 ## Filter results
 
@@ -410,3 +438,43 @@ print('Mean Annual MB (2000-2018): ' + str(round(glacier_change[glacier_change.t
 # par_names = spotpy.analyser.get_parameternames(trues)
 # param_zip = zip(par_names, best_param_values)
 # best_param = dict(param_zip)
+
+
+## Resample Matilda to filter for mass balance values
+
+dir = 'mswx_step5_best5-summer_demcz_6000_2022-12-13_13-44-03'
+
+db_name = dir.split('/')[-1]
+db_name_short = db_name[:len(db_name)-20]
+sampling_file = dir + '/' + db_name_short
+output_file = dir + '/' + db_name_short + '_kge_mb_matrix.csv'
+
+percentage = 1
+maximize = True
+
+output_file = sampling_file + '_kge_mb_matrix.csv'
+results = spotpy.analyser.load_csv_results(sampling_file)
+best = spotpy.analyser.get_posterior(results, maximize=maximize, percentage=percentage)  # get best xx% runs
+par_names = spotpy.analyser.get_parameter_fields(best)
+
+par = []
+mean_mb = []
+kge = []
+for i in range(0, len(best)):
+    params = spotpy.analyser.get_parameters(best)[i]
+    param_dict = dict(zip([i.split('par')[1] for i in par_names], params))
+    par.append(param_dict)
+    with mspot_glacier.HiddenPrints():
+        output_MATILDA = matilda_simulation(df_mswx, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31',
+                    sim_start='2000-01-01', sim_end='2017-12-31', freq="M", glacier_profile=glacier_profile,
+                    area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
+                    ele_dat=3273, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                    parameter_set=param_dict)
+    mean_mb.append(round(output_MATILDA[5].smb_water_year.mean() / 1000, 6))
+    kge.append(round(output_MATILDA[2], 4))
+
+kge_mb = pd.DataFrame({'kge': kge, 'mb': mean_mb, 'par': [str(i) for i in par]})
+kge_mb = kge_mb.sort_values('mb', ascending=False)
+kge_mb.to_csv(output_file)
+
+

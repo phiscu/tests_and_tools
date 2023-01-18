@@ -61,7 +61,7 @@ era_t = era_t.resample(time="D").mean(dim='time')                   # Daily temp
     # see: https://confluence.ecmwf.int/display/CUSF/Total+Precipitation+%5BValues+not+in+range%5D+-+ERA5-Land+hourly+data+from+1981+to+present
 
 # Observations:
-obs_hyd = pd.read_csv(obs_path + '/hyd/obs/Kyzylsuu_1982_2021_latest.csv')
+obs_hyd = pd.read_csv(obs_path + '/hyd/obs/Kyzylsuu_1982_2020_latest.csv')
 obs_met = pd.read_csv(obs_path + '/met/obs/met_data_full_kyzylsuu_2007-2015.csv', parse_dates=['time'], index_col='time')
 obs_met2 = pd.read_csv(obs_path + '/met/obs/kyzylsuu_hydromet_aws_2019-2020.csv', parse_dates=['time'], index_col='time')
 
@@ -90,7 +90,7 @@ print('Average altitude HARv2: ' + str(alt_har) + 'm')
 # ERA5L -   1982 - 2021
 # HARv2 -   1980 - 2020
 
-period = slice("1982", "2020")
+period = slice("1982", "2021")
 data_sets = [mswx_p, mswx_t, era_p, era_t, har_p, har_t]
 mswx_p, mswx_t, era_p, era_t, har_p, har_t = [i.sel(time=period) for i in data_sets]
 
@@ -131,12 +131,12 @@ era_t_cat, era_t_clip = weighted_avg(era_t, catchment, return_clip=True)
 
 ## Dataframes for plotting
 
-df_t = pd.concat([mswx_t_cat,har_t_cat,era_t_cat], axis=1, join='inner')
-df_t.columns = ['mswx','har','era']
+df_t = pd.concat([mswx_t_cat, har_t_cat, era_t_cat], axis=1, join='inner')
+df_t.columns = ['mswx', 'har', 'era']
 # df_t = df_t.resample('Y').mean()
 
 df_p = pd.concat([mswx_p_cat, har_p_cat, era_p_cat], axis=1, join='inner')
-df_p.columns = ['mswx','har','era']
+df_p.columns = ['mswx', 'har', 'era']
 # df_p = df_p.resample('Y').sum()
 
 ## Write to files
@@ -233,6 +233,7 @@ pcorrs.columns = ['mswx', 'har', 'era', 'aws']
 pcorrs.replace([np.inf, -np.inf], np.nan, inplace=True)
 print(pcorrs.columns)
 print([pcorrs[i].dropna().mean() for i in pcorrs.columns])
+print([pcorrs[i].dropna().std() for i in pcorrs.columns])
 
 
 # Results link the relation of a single grid cell and one weather station with the whole catchment...

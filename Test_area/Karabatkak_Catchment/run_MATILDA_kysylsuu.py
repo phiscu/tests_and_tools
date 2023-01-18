@@ -34,7 +34,7 @@ t2m_path = "/met/era5l/t2m_era5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv
 tp_path = "/met/era5l/tp_era5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv"
 t2m_agg_path = '/met/temp_cat_agg_era5l_harv2_mswx_1982-2020.csv'
 tp_agg_path = '/met/prec_cat_agg_era5l_harv2_mswx_1982-2020.csv'
-runoff_obs = "/hyd/obs/Kyzylsuu_1982_2021_latest.csv"
+runoff_obs = "/hyd/obs/Kyzylsuu_1982_2020_latest.csv"
 cmip_path = '/met/cmip6/'
 
     # Calibration period
@@ -73,11 +73,11 @@ glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 
 #> Data from 1982-01-01 to 1989-12-31 [8y], 1992-01-01 to 2007-12-31 [16y], 2010-01-01 to 2014-12-31 [5y], 2017-05-04 to 2021-07-30 [4y]
 
-# interf=4
-# freqst=2
-# k=21
-# par_iter = (1 + 4 * interf ** 2 * (1 + (k - 2) * freqst)) * k
-# print(par_iter)
+interf=4
+freqst=2
+k=21
+par_iter = (1 + 4 * interf ** 2 * (1 + (k - 2) * freqst)) * k
+print(par_iter)
 
 ##
 # Shean et.al. 2000-2018 - catchment-wide mean: -0.16	+-0.32
