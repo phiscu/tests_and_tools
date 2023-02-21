@@ -22,19 +22,29 @@ from Preprocessing_functions import dmod_score, df2long, cmip_plot_ensemble
 
 
 ###############################################################
+
+## What is called "era" from now on is actually HARv2 but wasn't renamed for a quick look.
+
+
 aws_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/obs/'
-era_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/era5l/'
+# era_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/era5l/'
+era_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/'
 cmip_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/cmip6/'
 
 aws_temp_int = pd.read_csv(aws_path + 't2m-with-gap_aws_2007-08-10-2016-01-01.csv', index_col='time', parse_dates=['time'])
 aws_prec = pd.read_csv(aws_path + 'tp_aws_2007-08-01-2016-01-01.csv', index_col='time', parse_dates=['time'])
 
-era_temp = pd.read_csv(era_path + 't2m_era5l_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
-era_temp_int = pd.read_csv(era_path + 't2m-with-gap_era5l_42.516-79.0167_2007-08-10-2016-01-01.csv', index_col='time', parse_dates=['time'])
-era_prec = pd.read_csv(era_path + 'tp_era5l_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
+# era_temp = pd.read_csv(era_path + 't2m_era5l_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
+# era_temp_int = pd.read_csv(era_path + 't2m-with-gap_era5l_42.516-79.0167_2007-08-10-2016-01-01.csv', index_col='time', parse_dates=['time'])
+# era_prec = pd.read_csv(era_path + 'tp_era5l_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
+#
+# era_corrT = pd.read_csv(era_path + 't2m_era5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
+# era_corrP = pd.read_csv(era_path + 'tp_era5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
 
-era_corrT = pd.read_csv(era_path + 't2m_era5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
-era_corrP = pd.read_csv(era_path + 'tp_era5l_adjust_42.516-79.0167_1982-01-01-2020-12-31.csv', index_col='time', parse_dates=['time'])
+era_corrT = pd.read_csv(era_path + 'temp_cat_agg_era5l_harv2_mswx_1982-2020.csv', index_col='time', parse_dates=['time'])
+era_corrP = pd.read_csv(era_path + 'prec_cat_agg_era5l_harv2_mswx_1982-2020.csv', index_col='time', parse_dates=['time'])
+era_corrT = era_corrT.har
+era_corrP = era_corrP.har
 
 scen = ['ssp1', 'ssp2', 'ssp3', 'ssp5']
 status = ['raw', 'adjusted']
@@ -45,14 +55,14 @@ cmip_corrP_mod = {}
 for s in scen:
     cmip_T = pd.read_csv(cmip_path + 't2m_CMIP6_all_models_raw_42.516-79.0167_1982-01-01-2100-12-31_'
                              + s + '.csv', index_col='time', parse_dates=['time'])
-    cmip_Tcorr = pd.read_csv(cmip_path + 't2m_CMIP6_all_models_adjusted_42.516-79.0167_1982-01-01-2100-12-31_'
+    cmip_Tcorr = pd.read_csv(cmip_path + 't2m_CMIP6_all_models_adjusted2harv2-catchm_42.516-79.0167_1982-01-01-2100-12-31_'
                              + s + '.csv', index_col='time', parse_dates=['time'])
     cmip_T_mod[s] = cmip_T
     cmip_corrT_mod[s] = cmip_Tcorr
 for s in scen:
     cmip_P = pd.read_csv(cmip_path + 'tp_CMIP6_all_models_raw_42.516-79.0167_1982-01-01-2100-12-31_'
                          + s + '.csv', index_col='time', parse_dates=['time'])
-    cmip_Pcorr = pd.read_csv(cmip_path + 'tp_CMIP6_all_models_adjusted_42.516-79.0167_1982-01-01-2100-12-31_'
+    cmip_Pcorr = pd.read_csv(cmip_path + 'tp_CMIP6_all_models_adjusted2harv2-catchm_42.516-79.0167_1982-01-01-2100-12-31_'
                          + s + '.csv', index_col='time', parse_dates=['time'])
     cmip_P_mod[s] = cmip_P
     cmip_corrP_mod[s] = cmip_Pcorr

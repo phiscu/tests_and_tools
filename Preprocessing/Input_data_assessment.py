@@ -28,7 +28,7 @@ har_path = home + '/EBA-CA/Tianshan_data/HARv2/variables/all_variables_HARv2_dai
 obs_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu'
 static_har_path = home + "/EBA-CA/Tianshan_data/HARv2/static/all_static_kyzylsuu_HARv2.nc"
 static_era_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/static/ERA5_land_Z_geopotential.nc'
-catchment_path = home + "/Ana-Lena_Phillip/data/input_output/input/observations/karabatkak/static/shapefile_hydro_kyzylsuu.shp"
+catchment_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/GIS/Kysylsuu/Catchment_shapefile_new.shp'
 
 ## Preprocessing:
 
@@ -152,9 +152,9 @@ print(df_p.sum())
 print('AWS: ' + str(obs_met.tp.sum()))
 
 # Number of days with no precipitation:
+print('MSWX: ' + str(mswx_p_cat[mswx_p_cat!=0].isna().sum()))
 print('HAR: ' + str(har_p_cat[har_p_cat!=0].isna().sum()))
 print('ERA: ' + str(era_p_cat[era_p_cat!=0].isna().sum()))
-print('MSWX: ' + str(mswx_p_cat[mswx_p_cat!=0].isna().sum()))
 
 
 ## Compare AWS period:
@@ -173,6 +173,7 @@ df_p_obs.resample('3M').sum().plot()
 plt.legend()
 plt.title('Precipitation in observation period')
 plt.show()
+
 
 ## Focus on summer months:
 
@@ -247,40 +248,40 @@ print([pcorrs[i].dropna().std() for i in pcorrs.columns])
 # ADAPTING THE ERA5 GRID TO FIT MSWX REDUCES THE AVERAGE TEMPERATURE BY ~2k AND THE MEAN ALTITUDE BY 115m
 # --> IS THE TRANSFORMATION OF HAR DATA CHANGING THE VALUES IN SIMILAR MANNER?
 
-# ele_dat=2550, ele_cat=3225 --> Average altitude ERA5L: 3273m (diff: 712m -> 4.34K), Average altitude HARv2: 3172m (diff: 611m -> 3,73K)
+# ele_dat=2561 (AWS), ele_cat=3287.1672 (Merit)
+#   --> Average altitude ERA5L: 3341 --> diff2AWS: 780 -> 4.68K, diff2catchment: 53.83
+#   --> Average altitude HARv2: 3256 --> diff2AWS: 695 -> 4.17K, diff2catchment: -31.17
 # Mean temps:
-# mswx    269.972291 + 4.34?? = 274.312
-# har     271.072891 + 3.73   = 274.803
-# era     269.057617 + 4.34   = 273.398
+# mswx    269.438239 + 4.68?? = 274.118
+# har     270.280027 + 4.17   = 274.450
+# era     268.641005 + 4.68   = 273.321
 # aws     274.00
 
 # Precipitation sums (1982-2020):
-# mswep    22473.098936
-# mswx     21327.885837
-# har      45094.336608
-# era      51453.429415
+# mswx    21227.937761
+# har     47363.199615
+# era     50809.670629
 
 # Precipitation sums (obs period):
-# mswep    3906.852969
-# mswx     3921.325947
-# har      8583.235540
-# era      9590.034351
+# mswx    3902.743760
+# har     9024.597155
+# era     9454.323305
 # aws      4330.10
 
 # Number of days without precipitation (of 14245):
-# mswx      2444 (17.1%)
+# mswx      2522 (17.7%)
 # har       1637 (11.5%)
-# era       536  (3.8%)
+# era       578  (4.1%)
 
 # Number of days without precipitation in obs period (of 2710):
 # mswx      498 (18.4%)
 # har       320 (11.8%)
-# era       114  (4.2%)
+# era       117  (4.3%)
 # aws       1956 (72.2%)
 
 # All datasets agree very well in temperature when applying a lapse rate of -0.006K/m
-# MSWX prec agrees best with obs but is even lower although obs have undercatch and mean altitude is much higher
-# --> underestimate likely --> undercatch correction??
+# MSWX prec agrees best with obs but shows even less although obs have undercatch and reference altitude is much higher
+#   --> underestimate likely --> undercatch correction??
 # HAR and ERA have twice the precipitation or more, HAR less than ERA
 # all datasets have far more precipitation events than obs, ERA5 is far off
 

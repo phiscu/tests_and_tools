@@ -101,7 +101,7 @@ lr_temp_up = -0.0055
 df_t = t2m_agg.set_index('time')                    # Set timeindex
 df_t.index = pd.to_datetime(df_t.index)
 df_t = df_t - 273.15                                # to °C
-ele = [723, 621, 723]           # Elevation differences data - glaciers: MSWX/ER5L - 723m   HARv2 - 621m
+ele = [780, 695, 780]           # Elevation differences data - glaciers: MSWX/ER5L - 780   HARv2 - 695
 
 ## 1.1 Check the influence of melt on the winter mass balance
 
@@ -218,7 +218,7 @@ mb_ann_matilda = mb_ann.reset_index()
 #                                      set_up_start='1997-01-01', set_up_end='1999-12-31',
 #                                      sim_start='2000-01-01', sim_end='2020-12-31', freq="D",
 #                                      glacier_profile=glacier_profile_karab, area_cat=karab_area, lat=42.33,
-#                                      elev_rescaling=True, ele_dat=3273,
+#                                      elev_rescaling=True, ele_dat=3341,
 #                                      ele_cat=None, area_glac=karab_area, ele_glac=3830,
 #                                      glacier_only=True, obs_type="winter",
 #                                      obj_dir="minimize",
@@ -255,7 +255,7 @@ mb_ann_matilda = mb_ann.reset_index()
 #                                      set_up_start='1997-01-01', set_up_end='1999-12-31',
 #                                      sim_start='2000-01-01', sim_end='2020-12-31', freq="D",
 #                                      glacier_profile=glacier_profile_karab, area_cat=karab_area, lat=42.33,
-#                                      elev_rescaling=True, ele_dat=3273,
+#                                      elev_rescaling=True, ele_dat=3341,
 #                                      ele_cat=None, area_glac=karab_area, ele_glac=3830,
 #                                      glacier_only=True, obs_type="annual",
 #                                      obj_dir="minimize",
@@ -306,7 +306,7 @@ mb_ann_matilda = mb_ann.reset_index()
 #                                      set_up_start='1997-01-01', set_up_end='1999-12-31',
 #                                      sim_start='2000-01-01', sim_end='2020-12-31', freq="D",
 #                                      area_cat=295.763, area_glac=32.51, lat=42.33,
-#                                      ele_dat=3273, ele_cat=3295, ele_glac=4068,
+#                                      ele_dat=3341, ele_cat=3295, ele_glac=4068,
 #                                      glacier_profile=glacier_profile, elev_rescaling=True,
 #                                      glacier_only=False,
 #                                      obj_dir="maximize",
@@ -334,7 +334,7 @@ param_dict = {"lr_temp": -0.00615, "lr_prec": 0.00198, "BETA": 1, "CET": 0.00017
 output_MATILDA = matilda_simulation(df_mswx, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2000-01-01', sim_end='2017-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
-                                    ele_dat=3273, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                                    ele_dat=3341, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
                                     parameter_set=param_dict)
 
 print('Mean Annual MB (2000-2017): ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' m w.e.')
@@ -347,12 +347,10 @@ print('Mean Annual MB (2000-2017): ' + str(round(output_MATILDA[5].smb_water_yea
 output_MATILDA = matilda_simulation(df_mswx, obs=obs, set_up_start='2015-01-01', set_up_end='2017-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2018-01-01', sim_end='2019-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
-                                    ele_dat=3273, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                                    ele_dat=3341, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
                                     parameter_set=param_dict)
 
 print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' m w.e.')
-
-# --> Runoff data 2020 seems shifted by ~3 months! --> Far better when excluded.
 
 ##
 # # param_dict = best_summary['best_param']
@@ -360,9 +358,9 @@ print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1
 DATAFRAME = df_mswx
 SEASON = 'winter'
 if DATAFRAME is df_har:
-    ele_dat = 3172
+    ele_dat = 3256
 else:
-    ele_dat = 3273
+    ele_dat = 3341
 
 parameter = matilda_parameter(DATAFRAME, set_up_start='1997-01-01', set_up_end='1999-12-31',
                               sim_start='2000-01-01', sim_end='2020-12-31', freq="D", lat=42.33,

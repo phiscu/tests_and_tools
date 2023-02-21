@@ -81,7 +81,7 @@ lr_temp_up = -0.0055
 df_t = t2m_agg.set_index('time')                    # Set timeindex
 df_t.index = pd.to_datetime(df_t.index)
 df_t = df_t - 273.15                                # to °C
-ele = [723, 621, 723]           # Elevation differences data - glaciers: MSWX/ER5L - 723m   HARv2 - 621m
+ele = [780, 695, 780]             # Elevation differences data - glaciers: MSWX/ER5L - 780   HARv2 - 695
 
 ## Step 2 - Limit the precipitation correction factor:
     # MSWX
