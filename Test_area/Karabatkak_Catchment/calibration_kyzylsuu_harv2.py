@@ -81,7 +81,7 @@ lr_temp_up = -0.0055
 df_t = t2m_agg.set_index('time')                    # Set timeindex
 df_t.index = pd.to_datetime(df_t.index)
 df_t = df_t - 273.15                                # to °C
-ele = [723, 621, 723]           # Elevation differences data - glaciers: MSWX/ER5L - 723m   HARv2 - 621m
+ele = [780, 695, 780]           # Elevation differences data - glaciers: MSWX/ER5L - 780   HARv2 - 695
 
 ## Step 2 - Limit the precipitation correction factor:
     # MSWX
@@ -200,7 +200,7 @@ param_dict = {'lr_temp': -0.0057281437, 'lr_prec': 0.0008959501, 'BETA': 3.23770
 output_MATILDA = matilda_simulation(df_har, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2000-01-01', sim_end='2017-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
-                                    ele_dat=3172, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                                    ele_dat=3256, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
                                     parameter_set=param_dict)
 
 print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' (+-'
@@ -240,7 +240,7 @@ output_MATILDA[7].show()
 output_MATILDA = matilda_simulation(df_har, obs=obs, set_up_start='2015-01-01', set_up_end='2017-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2018-01-01', sim_end='2019-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
-                                    ele_dat=3172, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                                    ele_dat=3256, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
                                     parameter_set=param_dict)
 
 print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' (+-'
@@ -252,9 +252,9 @@ print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1
 DATAFRAME = df_har
 SEASON = 'winter'
 if DATAFRAME is df_har:
-    ele_dat = 3172
+    ele_dat = 3256
 else:
-    ele_dat = 3273
+    ele_dat = 3341
 
 parameter = matilda_parameter(DATAFRAME, set_up_start='1997-01-01', set_up_end='1999-12-31',
                               sim_start='2000-01-01', sim_end='2020-12-31', freq="D", lat=42.33,

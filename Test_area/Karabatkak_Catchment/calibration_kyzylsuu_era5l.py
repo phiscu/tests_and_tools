@@ -153,7 +153,7 @@ param_dict = {'lr_temp': -0.00565, 'lr_prec': 0.00187, 'BETA': 2.022733, 'CET': 
 output_MATILDA = matilda_simulation(df_era, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2000-01-01', sim_end='2017-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
-                                    ele_dat=3273, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                                    ele_dat=3341, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
                                     parameter_set=param_dict)
 
 print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' (+-'
@@ -171,7 +171,7 @@ output_MATILDA[7].show()
 output_MATILDA = matilda_simulation(df_era, obs=obs, set_up_start='2015-01-01', set_up_end='2017-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2018-01-01', sim_end='2020-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
-                                    ele_dat=3273, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
+                                    ele_dat=3341, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,
                                     parameter_set=param_dict)
 
 print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' (+-'

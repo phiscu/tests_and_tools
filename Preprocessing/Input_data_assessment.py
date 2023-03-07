@@ -22,13 +22,15 @@ from Preprocessing_functions_conda import weighted_avg
 # start_date = '2007-01-01'; end_date = '2014-12-31'
 
 ## Paths:
-era_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/era5l'
-mswx_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/mswx'
-har_path = home + '/EBA-CA/Tianshan_data/HARv2/variables/all_variables_HARv2_daily_kyzylsuu_1980_2020.nc'
-obs_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu'
-static_har_path = home + "/EBA-CA/Tianshan_data/HARv2/static/all_static_kyzylsuu_HARv2.nc"
-static_era_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/static/ERA5_land_Z_geopotential.nc'
-catchment_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/GIS/Kysylsuu/Catchment_shapefile_new.shp'
+wd = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data'
+
+era_path = wd + '/input/kyzylsuu/met/era5l'
+mswx_path = wd + '/input/kyzylsuu/met/mswx'
+har_path = wd + '/input/kyzylsuu/met/harv2/all_variables_HARv2_daily_kyzylsuu_1980_2020.nc'
+obs_path = wd + '/input/kyzylsuu'
+static_har_path = wd + '/input/static/all_static_kyzylsuu_HARv2.nc'
+static_era_path = wd + '/input/static/ERA5_land_Z_geopotential.nc'
+catchment_path = wd + '/GIS/Kysylsuu/Catchment_shapefile_new.shp'
 
 ## Preprocessing:
 
