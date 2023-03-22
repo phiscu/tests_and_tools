@@ -26,7 +26,7 @@ elev = static_era.z/9.80665
 lat = Temp.lat * np.pi/180
 
 # Load catchment outline
-catchment = gpd.read_file(home + "/Seafile/Ana-Lena_Phillip/data/input_output/input/observations/karabatkak/static/shapefile_hydro_kyzylsuu.shp")
+# catchment = gpd.read_file(home + "/Seafile/Ana-Lena_Phillip/data/input_output/input/observations/karabatkak/static/shapefile_hydro_kyzylsuu.shp")
 
 ## Unit conversions:
 SWd = SWd * 0.0864  # from W/m² to MJ/(m²*d): 1 W = 86400 J/d = 0.0864 MJ/d

@@ -61,7 +61,7 @@ era_bc = era_bc["2007-01-01T00:00:00":"2014-12-31T00:00:00"]
 # print(har_ds.PROJ_NAME)  # Check original CRS
 # data_crs = ccrs.LambertConformal(central_longitude=float(har_ds.PROJ_CENTRAL_LON), central_latitude=float(har_ds.PROJ_CENTRAL_LAT), standard_parallels=(float(har_ds.PROJ_STANDARD_PAR1), float(har_ds.PROJ_STANDARD_PAR1)))
 # x, y = data_crs.transform_point(closest_lon, closest_lat, src_crs=ccrs.PlateCarree())
-#
+
 # pick = har_ds.sel(south_north=y, west_east=x, method='nearest')
 # har = pick.to_dataframe().filter(['t2', 'prcp'])
 # har.rename(columns={'t2':'t2m_har','prcp':'tp_har'}, inplace=True)

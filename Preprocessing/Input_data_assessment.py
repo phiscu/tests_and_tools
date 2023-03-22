@@ -26,11 +26,14 @@ wd = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data'
 
 era_path = wd + '/input/kyzylsuu/met/era5l'
 mswx_path = wd + '/input/kyzylsuu/met/mswx'
-har_path = wd + '/input/kyzylsuu/met/harv2/all_variables_HARv2_daily_kyzylsuu_1980_2020.nc'
+# har_path = wd + '/input/kyzylsuu/met/harv2/all_variables_HARv2_daily_kyzylsuu_1980_2020.nc'
+har_path = wd + '/input/kyzylsuu/met/harv2/all_variables_kyzylsuu_HARv2_daily_1980_2021.nc'
 obs_path = wd + '/input/kyzylsuu'
 static_har_path = wd + '/input/static/all_static_kyzylsuu_HARv2.nc'
 static_era_path = wd + '/input/static/ERA5_land_Z_geopotential.nc'
-catchment_path = wd + '/GIS/Kysylsuu/Catchment_shapefile_new.shp'
+# catchment_path = wd + '/GIS/Kysylsuu/Catchment_shapefile_new.shp'
+catchment_path = wd + '/GIS/Kysylsuu/catchment_merit.shp'
+
 
 ## Preprocessing:
 
@@ -74,6 +77,9 @@ catchment = gpd.read_file(catchment_path)
 static_era = salem.open_xr_dataset(static_era_path)
 static_har = salem.open_xr_dataset(static_har_path)
 static_har = mswx_p.salem.transform(static_har)
+
+# static_era = mswx_p.salem.transform(static_era)  # Regridding has a huge impact on the mean elevation: 3341m -> 3677m
+
 static_era = static_era.salem.roi(shape=catchment, all_touched=True).z/9.80665  # from geopotential to m.a.s.l.
 static_era = static_era[~np.isnan(static_era).all(axis=1), ~np.isnan(static_era).all(axis=0)]    # remove all NaN rows/cols
 static_har = static_har.salem.roi(shape=catchment, all_touched=True).hgt
@@ -90,11 +96,12 @@ print('Average altitude HARv2: ' + str(alt_har) + 'm')
 # MSWEP -   1979 - 2021-12-30
 # MSWX -    1979 - 2022-10-04
 # ERA5L -   1982 - 2021
-# HARv2 -   1980 - 2020
+# HARv2 -   1980 - 2021
 
 period = slice("1982", "2021")
 data_sets = [mswx_p, mswx_t, era_p, era_t, har_p, har_t]
 mswx_p, mswx_t, era_p, era_t, har_p, har_t = [i.sel(time=period) for i in data_sets]
+
 
 ## Compare values:
 
@@ -109,8 +116,6 @@ mswx_p, mswx_t, era_p, era_t, har_p, har_t = [i.sel(time=period) for i in data_s
 # mswx_p.salem.transform(era_p).mean(dim='time').plot(ax=ax[1, 1], zorder=-1, vmin=0.8, vmax=5.5)
 # ax[1, 1].set_title('ERA5L')
 # fig.tight_layout()
-#
-# plt.show()
 
 ## Catchment-wide aggregates:
 
@@ -161,9 +166,14 @@ print('ERA: ' + str(era_p_cat[era_p_cat!=0].isna().sum()))
 
 ## Compare AWS period:
 
-period_t = slice(obs_met.index[0], obs_met.index[-1])
-period_p = slice(obs_met.index[0], "2014-12-31")
+period_t = slice(obs_met.dropna().index[0], obs_met.index[-1])
+period_p = slice(obs_met.index[0], obs_met.dropna().index[-1])
 df_p_obs = pd.concat([df_p[period_p], obs_met.tp[period_p]], axis=1)
+df_t_obs = pd.concat([df_t[period_t], obs_met.t2m[period_t]], axis=1)
+
+print(df_t_obs.mean())
+print(df_p_obs.mean())
+print(df_p_obs.sum())
 
 df_t[period_t].resample('M').mean().plot()
 obs_met.t2m.resample('M').mean().plot()
@@ -253,10 +263,11 @@ print([pcorrs[i].dropna().std() for i in pcorrs.columns])
 # ele_dat=2561 (AWS), ele_cat=3287.1672 (Merit)
 #   --> Average altitude ERA5L: 3341 --> diff2AWS: 780 -> 4.68K, diff2catchment: 53.83
 #   --> Average altitude HARv2: 3256 --> diff2AWS: 695 -> 4.17K, diff2catchment: -31.17
-# Mean temps:
-# mswx    269.438239 + 4.68?? = 274.118
-# har     270.280027 + 4.17   = 274.450
-# era     268.641005 + 4.68   = 273.321
+#   --> Average altitude MSWX:
+# Mean temps in obs period:
+# mswx    269.411887 + 4.68?? = 274.092
+# har     270.499766 + 4.17   = 274.670
+# era     268.637610 + 4.68   = 273.318
 # aws     274.00
 
 # Precipitation sums (1982-2020):
@@ -270,7 +281,7 @@ print([pcorrs[i].dropna().std() for i in pcorrs.columns])
 # era     9454.323305
 # aws      4330.10
 
-# Number of days without precipitation (of 14245):
+# Number of days without precipitation (of 14245): --> without 2021
 # mswx      2522 (17.7%)
 # har       1637 (11.5%)
 # era       578  (4.1%)
