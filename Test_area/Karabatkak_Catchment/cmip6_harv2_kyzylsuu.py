@@ -127,10 +127,6 @@ param_dict = {'lr_temp': -0.006077369, 'lr_prec': 0.0013269137, 'BETA': 5.654754
               'RFS': 0.11432563}
 
 # Test
-df1 = matilda_scenarios['ssp1']['mean']
-
-df2 = har.reset_index().rename(columns={'time': 'TIMESTAMP', 't2m': 'T2', 'tp': 'RRR'})
-
 output_MATILDA = matilda_simulation(df1, **matilda_settings, parameter_set=param_dict)
 
 print('Mean Annual MB: ' + str(round(output_MATILDA[5].smb_water_year.mean() / 1000, 2)) + ' (+-'
@@ -139,7 +135,7 @@ print(output_MATILDA[5])
 
 # output_MATILDA[7].show()
 # output_MATILDA[9].show()
-## Loop through all scenarios and models:
+## Loop through all scenarios and models:       BAUSTELLE!
 
 matilda_scenarios.items()
 
