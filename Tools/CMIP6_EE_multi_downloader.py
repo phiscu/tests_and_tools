@@ -21,7 +21,7 @@ except Exception as e:
 This tool applies an approach by [Noel Gorelick et. al.](https://gorelick.medium.com/fast-er-downloads-a2abd512aa26)
 to download daily CMIP6 data from Google Earth Engine using parallel requests. It applies an area-weighted averaging 
 to all overlapping grid cells within a provided polygon and stores individual years in separate CSV files.
-The files are then loaded and combined in dataframes.
+The files are then loaded, pre-processed, and combined in dataframes.
 
 @author: Phillip Schuster and Alexander Georgi
 """
@@ -144,7 +144,7 @@ output_gpkg = wd + '/matilda_edu/output/catchment_data.gpkg'
 catchment_new = gpd.read_file(output_gpkg, layer='catchment_new')
 catchment = geemap.geopandas_to_ee(catchment_new)
 
-downloader = CMIPDownloader('tas', 1979, 2100, catchment, processes=25, dir=wd + '/ee_download_test')
+downloader = CMIPDownloader('tas', 2000, 2020, catchment, processes=25, dir=wd + '/ee_download_test/new_test')
 downloader.download()
 
 
@@ -181,7 +181,7 @@ class CMIPProcessor:
             starty = 2015
             endy = 2100
         for i in range(starty, endy + 1):
-            filename = dir + '/cmip6_' + var + '_' + str(i) + '.csv'
+            filename = dir + 'cmip6_' + var + '_' + str(i) + '.csv'
             df_list.append(self.read_cmip(filename))
         if hist:
             hist_df = pd.concat(df_list).drop('historical_GFDL-CM4_' + var, axis=1)
@@ -205,7 +205,18 @@ class CMIPProcessor:
         ssp5.columns = ssp5.columns.str.lstrip('ssp585_').str.rstrip('_' + self.var)
         hist.columns = hist.columns.str.lstrip('historical_').str.rstrip('_' + self.var)
 
+        # Get all the models the three datasets have in common
         common_models = set(ssp2.columns).intersection(ssp5.columns).intersection(hist.columns)
+
+        # Get the model names that contain NaN values
+        nan_models_list = [df.columns[df.isna().any()].tolist() for df in [ssp2, ssp5, hist]]
+        # flatten the list
+        nan_models = [col for sublist in nan_models_list for col in sublist]
+        # remove duplicates
+        nan_models = list(set(nan_models))
+
+        # Remove models with NaN values from the list of common models
+        common_models = [x for x in common_models if x not in nan_models]
 
         ssp2_common = ssp2.loc[:, common_models]
         ssp5_common = ssp5.loc[:, common_models]
@@ -229,6 +240,36 @@ class CMIPProcessor:
 
 
 ## Usage example
-processor = CMIPProcessor(dir=wd + '/ee_download_test', var='pr')
+processor = CMIPProcessor(dir=wd + '/ee_download_test/', var='pr')
 ssp2_pr, ssp5_pr = processor.get_results()
-print(processor.dropped_models)
+processor = CMIPProcessor(dir=wd + '/ee_download_test/', var='tas')
+ssp2_tas, ssp5_tas = processor.get_results()
+
+
+
+## Bias-adjustment of CMIP6 data using ERA5-Land
+
+from bias_correction import BiasCorrection
+
+def read_era5l(file_path):
+    return pd.read_csv(file_path, **{
+        'usecols':      ['temp', 'prec', 'dt'],
+        'index_col':    'dt',
+        'parse_dates':  ['dt']})
+
+tr_data = read_era5l(wd + '/matilda_edu/output/ERA5L.csv')
+
+train_slice = slice('1979-01-01', '2014-12-31')
+predict_slice = slice('2015-01-01', '2100-12-31')
+
+cmip_corrT_mod = pd.DataFrame()
+for m in ssp2_tas.columns:
+    x_train = ssp2_tas[m][train_slice].squeeze()
+    y_train = tr_data[train_slice]['temp'].squeeze()
+    x_predict = ssp2_tas[m][predict_slice].squeeze()
+    bc_cmip = BiasCorrection(y_train, x_train, x_predict)
+
+    cmip_corrT_mod[m] = pd.DataFrame(bc_cmip.correct(method='normal_mapping'))
+
+
+############# CONTINUE ###################
