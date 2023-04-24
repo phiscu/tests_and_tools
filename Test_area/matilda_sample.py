@@ -1,4 +1,4 @@
-## import of necessary packages
+##
 import pandas as pd
 from pathlib import Path
 home = str(Path.home())

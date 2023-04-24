@@ -152,11 +152,11 @@ downloader.download()
 
 class CMIPProcessor:
     """Class to read and pre-process CSV files downloaded by the CMIPDownloader class."""
-    def __init__(self, var, dir='.'):
-        self.dir = dir
+    def __init__(self, var, file_dir='.'):
+        self.file_dir = file_dir
         self.var = var
-        self.df_hist = self.append_df(self.var, self.dir, hist=True)
-        self.df_ssp = self.append_df(self.var, self.dir, hist=False)
+        self.df_hist = self.append_df(self.var, self.file_dir, hist=True)
+        self.df_ssp = self.append_df(self.var, self.file_dir, hist=False)
         self.ssp2_common, self.ssp5_common, self.hist_common,\
             self.common_models, self.dropped_models = self.process_dataframes()
         self.ssp2, self.ssp5 = self.get_results()
@@ -168,7 +168,7 @@ class CMIPProcessor:
         df = df.drop(['system:index', '.geo', 'system:time_start'], axis=1)
         return df
 
-    def append_df(self, var, dir='.', hist=True):
+    def append_df(self, var, file_dir='.', hist=True):
         """Reads CMIP6 CSV files of individual years and concatenates them into dataframes for the full downloaded
         period. Historical and scenario datasets are treated separately. Drops a model with data gaps.
         Converts precipitation unit to mm."""
@@ -181,15 +181,15 @@ class CMIPProcessor:
             starty = 2015
             endy = 2100
         for i in range(starty, endy + 1):
-            filename = dir + 'cmip6_' + var + '_' + str(i) + '.csv'
+            filename = file_dir + 'cmip6_' + var + '_' + str(i) + '.csv'
             df_list.append(self.read_cmip(filename))
         if hist:
-            hist_df = pd.concat(df_list).drop('historical_GFDL-CM4_' + var, axis=1)
+            hist_df = pd.concat(df_list)
             if var == 'pr':
                 hist_df = hist_df * 86400       # from kg/(m^2*s) to mm/day
             return hist_df
         else:
-            ssp_df = pd.concat(df_list).drop(['ssp585_GFDL-CM4_' + var, 'ssp245_GFDL-CM4_' + var], axis=1)
+            ssp_df = pd.concat(df_list)
             if var == 'pr':
                 ssp_df = ssp_df * 86400       # from kg/(m^2*s) to mm/day
             return ssp_df
@@ -240,36 +240,82 @@ class CMIPProcessor:
 
 
 ## Usage example
-processor = CMIPProcessor(dir=wd + '/ee_download_test/', var='pr')
+processor = CMIPProcessor(file_dir=wd + '/ee_download_test/', var='pr')
 ssp2_pr, ssp5_pr = processor.get_results()
-processor = CMIPProcessor(dir=wd + '/ee_download_test/', var='tas')
+processor = CMIPProcessor(file_dir=wd + '/ee_download_test/', var='tas')
 ssp2_tas, ssp5_tas = processor.get_results()
 
 
-
 ## Bias-adjustment of CMIP6 data using ERA5-Land
+era5_file = wd + '/matilda_edu/output/ERA5L.csv'
 
 from bias_correction import BiasCorrection
 
-def read_era5l(file_path):
-    return pd.read_csv(file_path, **{
+
+def read_era5l(file):
+    return pd.read_csv(file, **{
         'usecols':      ['temp', 'prec', 'dt'],
         'index_col':    'dt',
         'parse_dates':  ['dt']})
 
-tr_data = read_era5l(wd + '/matilda_edu/output/ERA5L.csv')
 
-train_slice = slice('1979-01-01', '2014-12-31')
-predict_slice = slice('2015-01-01', '2100-12-31')
+def adjust_bias(predictand, predictor, method='normal_mapping'):
 
-cmip_corrT_mod = pd.DataFrame()
-for m in ssp2_tas.columns:
-    x_train = ssp2_tas[m][train_slice].squeeze()
-    y_train = tr_data[train_slice]['temp'].squeeze()
-    x_predict = ssp2_tas[m][predict_slice].squeeze()
-    bc_cmip = BiasCorrection(y_train, x_train, x_predict)
+    predictor = read_era5l(predictor)
+    if predictand.mean().mean() > 100:
+        var = 'temp'
+    else:
+        var = 'prec'
 
-    cmip_corrT_mod[m] = pd.DataFrame(bc_cmip.correct(method='normal_mapping'))
+    training_period = slice('1979-01-01', '2014-12-31')
+    prediction_period = slice('2015-01-01', '2100-12-31')
 
+    corr = pd.DataFrame()
+    for m in predictand.columns:
+        x_train = predictand[m][training_period].squeeze()
+        y_train = predictor[training_period][var].squeeze()
+        x_predict = predictand[m][prediction_period].squeeze()
+        bc_corr = BiasCorrection(y_train, x_train, x_predict)
+        corr[m] = pd.DataFrame(bc_corr.correct(method=method))
+
+    return corr
+
+adjust_bias(ssp5_tas, era5_file)
+
+##
+
+import pandas as pd
+from bias_correction import BiasCorrection
+class AdjustBias:
+    def __init__(self, predictand, predictor, method='normal_mapping'):
+        self.predictor = read_era5l(predictor)
+        self.predictand = predictand
+        self.method = method
+        if predictand.mean().mean() > 100:
+            self.var = 'temp'
+        else:
+            self.var = 'prec'
+        self.training_period = slice('1979-01-01', '2014-12-31')
+        self.prediction_period = slice('2015-01-01', '2100-12-31')
+        self.corr = pd.DataFrame()
+    def read_era5l(self, file):
+        return pd.read_csv(file, **{
+            'usecols':      ['temp', 'prec', 'dt'],
+            'index_col':    'dt',
+            'parse_dates':  ['dt']})
+    def adjust_bias(self):
+         for m in self.predictand.columns:
+            x_train = self.predictand[m][self.training_period].squeeze()
+            y_train = self.predictor[self.training_period][self.var].squeeze()
+            x_predict = self.predictand[m][self.prediction_period].squeeze()
+            bc_corr = BiasCorrection(y_train, x_train, x_predict)
+            self.corr[m] = pd.DataFrame(bc_corr.correct(method=self.method))
+         return self.corr
+
+
+ab = AdjustBias(ssp5_tas, era5_file)
+ab.adjust_bias()
+
+#   IN VERSCHIEDENEN KOMBIS WEITER TESTEN!
 
 ############# CONTINUE ###################
