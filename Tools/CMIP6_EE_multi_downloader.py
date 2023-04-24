@@ -170,8 +170,7 @@ class CMIPProcessor:
 
     def append_df(self, var, file_dir='.', hist=True):
         """Reads CMIP6 CSV files of individual years and concatenates them into dataframes for the full downloaded
-        period. Historical and scenario datasets are treated separately. Drops a model with data gaps.
-        Converts precipitation unit to mm."""
+        period. Historical and scenario datasets are treated separately. Converts precipitation unit to mm."""
 
         df_list = []
         if hist:
@@ -229,27 +228,33 @@ class CMIPProcessor:
         return ssp2_common, ssp5_common, hist_common, common_models, dropped_models
 
     def get_results(self):
-        """Concatenates historical and scenario data to combined dataframes of the full downloaded period."""
+        """Concatenates historical and scenario data to combined dataframes of the full downloaded period.
+        Arranges the models in alphabetical order."""
 
         ssp2_full = pd.concat([self.hist_common, self.ssp2_common])
         ssp2_full.index.names = ['TIMESTAMP']
         ssp5_full = pd.concat([self.hist_common, self.ssp5_common])
         ssp5_full.index.names = ['TIMESTAMP']
 
+        ssp2_full = ssp2_full.reindex(sorted(ssp2_full.columns), axis=1)
+        ssp5_full = ssp5_full.reindex(sorted(ssp5_full.columns), axis=1)
+
+
         return ssp2_full, ssp5_full
 
 
 ## Usage example
 processor = CMIPProcessor(file_dir=wd + '/ee_download_test/', var='pr')
-ssp2_pr, ssp5_pr = processor.get_results()
+ssp2_pr_raw, ssp5_pr_raw = processor.get_results()
 processor = CMIPProcessor(file_dir=wd + '/ee_download_test/', var='tas')
-ssp2_tas, ssp5_tas = processor.get_results()
+ssp2_tas_raw, ssp5_tas_raw = processor.get_results()
 
 
 ## Bias-adjustment of CMIP6 data using ERA5-Land
-era5_file = wd + '/matilda_edu/output/ERA5L.csv'
 
 from bias_correction import BiasCorrection
+
+era5_file = wd + '/matilda_edu/output/ERA5L.csv'
 
 
 def read_era5l(file):
@@ -260,16 +265,13 @@ def read_era5l(file):
 
 
 def adjust_bias(predictand, predictor, method='normal_mapping'):
-
     predictor = read_era5l(predictor)
     if predictand.mean().mean() > 100:
         var = 'temp'
     else:
         var = 'prec'
-
     training_period = slice('1979-01-01', '2014-12-31')
-    prediction_period = slice('2015-01-01', '2100-12-31')
-
+    prediction_period = slice('1979-01-01', '2100-12-31')
     corr = pd.DataFrame()
     for m in predictand.columns:
         x_train = predictand[m][training_period].squeeze()
@@ -280,42 +282,64 @@ def adjust_bias(predictand, predictor, method='normal_mapping'):
 
     return corr
 
-adjust_bias(ssp5_tas, era5_file)
+ssp2_tas = adjust_bias(ssp2_tas_raw, era5_file)
+ssp5_tas = adjust_bias(ssp5_tas_raw, era5_file)
+ssp2_pr = adjust_bias(ssp2_pr_raw, era5_file)
+ssp5_pr = adjust_bias(ssp5_pr_raw, era5_file)
 
-##
+era5 = read_era5l(era5_file)
 
-import pandas as pd
-from bias_correction import BiasCorrection
-class AdjustBias:
-    def __init__(self, predictand, predictor, method='normal_mapping'):
-        self.predictor = read_era5l(predictor)
-        self.predictand = predictand
-        self.method = method
-        if predictand.mean().mean() > 100:
-            self.var = 'temp'
-        else:
-            self.var = 'prec'
-        self.training_period = slice('1979-01-01', '2014-12-31')
-        self.prediction_period = slice('2015-01-01', '2100-12-31')
-        self.corr = pd.DataFrame()
-    def read_era5l(self, file):
-        return pd.read_csv(file, **{
-            'usecols':      ['temp', 'prec', 'dt'],
-            'index_col':    'dt',
-            'parse_dates':  ['dt']})
-    def adjust_bias(self):
-         for m in self.predictand.columns:
-            x_train = self.predictand[m][self.training_period].squeeze()
-            y_train = self.predictor[self.training_period][self.var].squeeze()
-            x_predict = self.predictand[m][self.prediction_period].squeeze()
-            bc_corr = BiasCorrection(y_train, x_train, x_predict)
-            self.corr[m] = pd.DataFrame(bc_corr.correct(method=self.method))
-         return self.corr
+## Plots
+import matplotlib.pyplot as plt
 
 
-ab = AdjustBias(ssp5_tas, era5_file)
-ab.adjust_bias()
+def cmip_plot(ax, df, title, precip=False, intv_sum='M', intv_mean='10Y',  era_label=False):
+    if not precip:
+        ax.plot(df.resample(intv_mean).mean().iloc[:, :-1], linewidth=0.6)
+        ax.plot(df.resample(intv_mean).mean().iloc[:, -1], linewidth=1, c='black')
+        era_plot, = ax.plot(era5['temp'].resample(intv_mean).mean(), linewidth=1.5, c='red', label='ERA5L',
+                            linestyle='dashed')
+    else:
+        ax.plot(df.resample(intv_sum).sum().resample(intv_mean).mean().iloc[:, :-1],
+                linewidth=0.6)
+        ax.plot(df.resample(intv_sum).sum().resample(intv_mean).mean().iloc[:, -1],
+                linewidth=1, c='black')
+        era_plot, = ax.plot(era5['prec'].resample(intv_sum).sum().resample(intv_mean).mean(), linewidth=1.5, c='red',
+                    label='ERA5L', linestyle='dashed')
+    if era_label:
+        ax.legend(handles=[era_plot], loc='upper left')
+    ax.set_title(title)
+    ax.grid(True)
 
-#   IN VERSCHIEDENEN KOMBIS WEITER TESTEN!
+
+# Temperature:
+interval = '10Y'
+figure, axis = plt.subplots(2, 2, figsize=(12, 12), sharex="col", sharey="all")
+cmip_plot(axis[0, 0], ssp2_tas_raw, era_label=True, title='SSP2 raw', intv_mean=interval)
+cmip_plot(axis[0, 1], ssp2_tas, title='SSP2 adjusted', intv_mean=interval)
+cmip_plot(axis[1, 0], ssp5_tas_raw, title='SSP5 raw', intv_mean=interval)
+cmip_plot(axis[1, 1], ssp5_tas, title='SSP5 adjusted', intv_mean=interval)
+figure.legend(ssp5_tas.columns, loc='lower right', ncol=6, mode="expand")
+figure.tight_layout()
+figure.subplots_adjust(bottom=0.15, top=0.92)
+figure.suptitle('10y Mean of Air Temperature', fontweight='bold')
+plt.show()
+
+# Precipitation:
+interval = '10Y'
+figure, axis = plt.subplots(2, 2, figsize=(12, 12), sharex="col", sharey="all")
+cmip_plot(axis[0, 0], ssp2_pr_raw, era_label=True, title='SSP2 raw', precip=True)
+cmip_plot(axis[0, 1], ssp2_pr, title='SSP2 adjusted', precip=True)
+cmip_plot(axis[1, 0], ssp5_pr_raw, title='SSP5 raw', precip=True)
+cmip_plot(axis[1, 1], ssp5_pr, title='SSP5 adjusted', precip=True)
+figure.legend(ssp5_pr.columns, loc='lower right', ncol=6, mode="expand")
+figure.tight_layout()
+figure.subplots_adjust(bottom=0.15, top=0.92)
+figure.suptitle('10y Mean of Monthly Precipitation', fontweight='bold')
+plt.show()
+
+
+# ZWEI AUSREIẞER BEI DEN TEMPERATUREN
+# ERA5 NIEDERSCHLAG CA. 4 MAL SO HOCH WIE CMIP. FEHLER? BEI ECMWF DATEN GENAUSO?
 
 ############# CONTINUE ###################
