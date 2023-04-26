@@ -153,7 +153,6 @@ cmip_plot_ensemble(cmip_corrT_mod, era_corrT, intv_mean='Y')
 # Precipitation:
 cmip_plot_ensemble(cmip_corrP_mod, era_corrP, precip=True, intv_sum='Y', intv_mean='Y')
 
-
 ## Violinplots for all models per scenario
 
     # All models (1980-2100)
