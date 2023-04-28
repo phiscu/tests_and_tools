@@ -2,8 +2,6 @@
 import ee
 import geemap
 import pandas as pd
-import logging
-import multiprocessing
 import geopandas as gpd
 import concurrent.futures
 import os
@@ -144,8 +142,11 @@ output_gpkg = wd + '/matilda_edu/output/catchment_data.gpkg'
 catchment_new = gpd.read_file(output_gpkg, layer='catchment_new')
 catchment = geemap.geopandas_to_ee(catchment_new)
 
-# downloader = CMIPDownloader('tas', 2000, 2020, catchment, processes=25, dir=wd + '/ee_download_test/new_test')
-# downloader.download()
+cmip_dir = wd + '/matilda_edu/output/' + 'cmip6/'
+# downloader_t = CMIPDownloader('tas', 1979, 2100, catchment, processes=30, dir=cmip_dir)
+# downloader_t.download()
+# downloader_p = CMIPDownloader('pr', 1979, 2100, catchment, processes=30, dir=cmip_dir)
+# downloader_p.download()
 
 
 ## Class to pre-process the downloaded files
@@ -244,9 +245,9 @@ class CMIPProcessor:
 
 
 ## Usage example
-processor = CMIPProcessor(file_dir=wd + '/ee_download_test/', var='pr')
+processor = CMIPProcessor(file_dir=cmip_dir, var='pr')
 ssp2_pr_raw, ssp5_pr_raw = processor.get_results()
-processor = CMIPProcessor(file_dir=wd + '/ee_download_test/', var='tas')
+processor = CMIPProcessor(file_dir=cmip_dir, var='tas')
 ssp2_tas_raw, ssp5_tas_raw = processor.get_results()
 
 
@@ -264,7 +265,6 @@ def read_era5l(file):
         'usecols':      ['temp', 'prec', 'dt'],
         'index_col':    'dt',
         'parse_dates':  ['dt']}).resample('D').agg({'temp': 'mean', 'prec': 'sum'})
-
 
 def adjust_bias(predictand, predictor, method='normal_mapping'):
     """Applies scaled distribution mapping to all passed climate projections (predictand)
@@ -288,60 +288,79 @@ def adjust_bias(predictand, predictor, method='normal_mapping'):
 
 ssp2_tas = adjust_bias(ssp2_tas_raw, era5_file)
 ssp5_tas = adjust_bias(ssp5_tas_raw, era5_file)
-ssp2_pr = adjust_bias(ssp2_pr_raw, era5_file)       # method='gamma_mapping' results in a strange output
+ssp2_pr = adjust_bias(ssp2_pr_raw, era5_file)
 ssp5_pr = adjust_bias(ssp5_pr_raw, era5_file)
 
 era5 = read_era5l(era5_file)
+
+
+## Create input for plotting functions
+
+ssp_tas_dict = {'SSP2_raw': ssp2_tas_raw, 'SSP2_adjusted': ssp2_tas, 'SSP5_raw': ssp5_tas_raw, 'SSP5_adjusted': ssp5_tas}
+ssp_pr_dict = {'SSP2_raw': ssp2_pr_raw, 'SSP2_adjusted': ssp2_pr, 'SSP5_raw': ssp5_pr_raw, 'SSP5_adjusted': ssp5_pr}
+
 
 ## Timeseries plots
 import matplotlib.pyplot as plt
 
 
-def cmip_plot(ax, df, title, precip=False, intv_sum='M', intv_mean='10Y',  era_label=False):
+def cmip_plot(ax, df, title, target, precip=False, intv_sum='M', intv_mean='10Y',
+              target_label='Target', show_target_label=False):
+    """Resamples and plots climate model and target data."""
     if not precip:
         ax.plot(df.resample(intv_mean).mean().iloc[:, :-1], linewidth=0.6)
         ax.plot(df.resample(intv_mean).mean().iloc[:, -1], linewidth=1, c='black')
-        era_plot, = ax.plot(era5['temp'].resample(intv_mean).mean(), linewidth=1.5, c='red', label='ERA5L',
+        era_plot, = ax.plot(target['temp'].resample(intv_mean).mean(), linewidth=1.5, c='red', label=target_label,
                             linestyle='dashed')
     else:
         ax.plot(df.resample(intv_sum).sum().resample(intv_mean).mean().iloc[:, :-1],
                 linewidth=0.6)
         ax.plot(df.resample(intv_sum).sum().resample(intv_mean).mean().iloc[:, -1],
                 linewidth=1, c='black')
-        era_plot, = ax.plot(era5['prec'].resample(intv_sum).sum().resample(intv_mean).mean(), linewidth=1.5, c='red',
-                    label='ERA5L', linestyle='dashed')
-    if era_label:
+        era_plot, = ax.plot(target['prec'].resample(intv_sum).sum().resample(intv_mean).mean(), linewidth=1.5,
+                            c='red', label=target_label, linestyle='dashed')
+    if show_target_label:
         ax.legend(handles=[era_plot], loc='upper left')
     ax.set_title(title)
     ax.grid(True)
+    
 
+def cmip_plot_combined(data, target, title, precip=False, intv_sum='M', intv_mean='10Y',
+                       target_label='Target', show=False):
+    """Combines multiple subplots of climate data in different scenarios before and after bias adjustment.
+    Shows target data for comparison"""
 
-# Temperature:
-interval = '10Y'
-figure, axis = plt.subplots(2, 2, figsize=(12, 12), sharex="col", sharey="all")
-cmip_plot(axis[0, 0], ssp2_tas_raw, era_label=True, title='SSP2 raw', intv_mean=interval)
-cmip_plot(axis[0, 1], ssp2_tas, title='SSP2 adjusted', intv_mean=interval)
-cmip_plot(axis[1, 0], ssp5_tas_raw, title='SSP5 raw', intv_mean=interval)
-cmip_plot(axis[1, 1], ssp5_tas, title='SSP5 adjusted', intv_mean=interval)
-figure.legend(ssp5_tas.columns, loc='lower right', ncol=6, mode="expand")
-figure.tight_layout()
-figure.subplots_adjust(bottom=0.15, top=0.92)
-figure.suptitle('10y Mean of Air Temperature', fontweight='bold')
-plt.show()
+    figure, axis = plt.subplots(2, 2, figsize=(12, 12), sharex="col", sharey="all")
+    
+    t_kwargs = {'target': target, 'intv_mean': intv_mean, 'target_label': target_label}
+    p_kwargs = {'target': target, 'intv_mean': intv_mean, 'target_label': target_label,
+                'intv_sum': intv_sum, 'precip': True}
 
-# Precipitation:
-interval = '10Y'
-figure, axis = plt.subplots(2, 2, figsize=(12, 12), sharex="col", sharey="all")
-cmip_plot(axis[0, 0], ssp2_pr_raw, era_label=True, title='SSP2 raw', precip=True)
-cmip_plot(axis[0, 1], ssp2_pr, title='SSP2 adjusted', precip=True)
-cmip_plot(axis[1, 0], ssp5_pr_raw, title='SSP5 raw', precip=True)
-cmip_plot(axis[1, 1], ssp5_pr, title='SSP5 adjusted', precip=True)
-figure.legend(ssp5_pr.columns, loc='lower right', ncol=6, mode="expand")
-figure.tight_layout()
-figure.subplots_adjust(bottom=0.15, top=0.92)
-figure.suptitle('10y Mean of Monthly Precipitation', fontweight='bold')
-plt.show()
+    if not precip:
+        cmip_plot(axis[0, 0], data['SSP2_raw'], show_target_label=True, title='SSP2 raw', **t_kwargs)
+        cmip_plot(axis[0, 1], data['SSP2_adjusted'], title='SSP2 adjusted', **t_kwargs)
+        cmip_plot(axis[1, 0], data['SSP5_raw'], title='SSP5 raw', **t_kwargs)
+        cmip_plot(axis[1, 1], data['SSP5_adjusted'], title='SSP5 adjusted', **t_kwargs)
+        figure.legend(data['SSP5_adjusted'].columns, loc='lower right', ncol=6, mode="expand")
+        figure.tight_layout()
+        figure.subplots_adjust(bottom=0.15, top=0.92)
+        figure.suptitle(title, fontweight='bold')
+        if show:
+            plt.show()
+    else:
+        cmip_plot(axis[0, 0], data['SSP2_raw'], show_target_label=True, title='SSP2 raw', **p_kwargs)
+        cmip_plot(axis[0, 1], data['SSP2_adjusted'], title='SSP2 adjusted', **p_kwargs)
+        cmip_plot(axis[1, 0], data['SSP5_raw'], title='SSP5 raw', **p_kwargs)
+        cmip_plot(axis[1, 1], data['SSP5_adjusted'], title='SSP5 adjusted', **p_kwargs)
+        figure.legend(data['SSP5_adjusted'].columns, loc='lower right', ncol=6, mode="expand")
+        figure.tight_layout()
+        figure.subplots_adjust(bottom=0.15, top=0.92)
+        figure.suptitle(title, fontweight='bold')
+        if show:
+            plt.show()
 
+# cmip_plot_combined(ssp_tas_dict, era5, '10y Mean of Air Temperature', target_label='ERA5-Land', show=True)
+# cmip_plot_combined(ssp_pr_dict, era5, 'Mean of Monthly Precipitation', precip=True, target_label='ERA5-Land', show=True)
 
 # ZWEI AUSREIẞER BEI DEN TEMPERATUREN
 # ERA5 NIEDERSCHLAG CA. 4 MAL SO HOCH WIE CMIP. FEHLER? BEI ECMWF DATEN GENAUSO?
@@ -352,19 +371,23 @@ import warnings
 import seaborn as sns
 from matplotlib.legend import Legend
 
-def df2long(df, intv_sum='M', intv_mean='Y', precip=False):       # Convert dataframes to long format for use in seaborn-lineplots.
+def df2long(df, intv_sum='M', intv_mean='Y', precip=False):
+    """Resamples dataframes and converts them into long format to be passed to seaborn.lineplot()."""
+
     if precip:
         df = df.resample(intv_sum).sum().resample(intv_mean).mean()
         df = df.reset_index()
-        df = df.melt('TIMESTAMP', var_name='model', value_name='tp')
+        df = df.melt('TIMESTAMP', var_name='model', value_name='prec')
     else:
         df = df.resample(intv_mean).mean()
         df = df.reset_index()
-        df = df.melt('TIMESTAMP', var_name='model', value_name='t2m')
+        df = df.melt('TIMESTAMP', var_name='model', value_name='temp')
     return df
 
 
 def cmip_plot_ensemble(cmip, era, precip=False, intv_sum='M', intv_mean='Y', figsize=(10, 6), show=True):
+    """Plots the multi-model mean of climate scenarios including the 90% confidence interval."""
+
     warnings.filterwarnings(action='ignore')
     figure, axis = plt.subplots(figsize=figsize)
 
@@ -376,7 +399,7 @@ def cmip_plot_ensemble(cmip, era, precip=False, intv_sum='M', intv_mean='Y', fig
     if precip:
         for i in cmip.keys():
             df = df2long(cmip[i], intv_sum=intv_sum, intv_mean=intv_mean, precip=True)
-            sns.lineplot(data=df, x='TIMESTAMP', y='tp', color=col_dict[i])
+            sns.lineplot(data=df, x='TIMESTAMP', y='prec', color=col_dict[i])
         axis.set(xlabel='Year', ylabel='Mean Precipitation [mm]')
         if intv_sum=='M':
             figure.suptitle('Mean Monthly Precipitation [mm]', fontweight='bold')
@@ -387,7 +410,7 @@ def cmip_plot_ensemble(cmip, era, precip=False, intv_sum='M', intv_mean='Y', fig
     else:
         for i in cmip.keys():
             df = df2long(cmip[i], intv_mean=intv_mean)
-            sns.lineplot(data=df, x='TIMESTAMP', y='t2m', color=col_dict[i])
+            sns.lineplot(data=df, x='TIMESTAMP', y='temp', color=col_dict[i])
         axis.set(xlabel='Year', ylabel='Mean Air Temperature [K]')
         if intv_mean=='10Y':
             figure.suptitle('Mean 10y Air Temperature [K]', fontweight='bold')
@@ -410,97 +433,100 @@ def cmip_plot_ensemble(cmip, era, precip=False, intv_sum='M', intv_mean='Y', fig
         plt.show()
     warnings.filterwarnings(action='always')
 
-
-ssp_tas_dict = {'SSP2_raw': ssp2_tas_raw, 'SSP2_adjusted': ssp2_tas, 'SPP5_raw': ssp5_tas_raw, 'SSP5_adjusted': ssp5_tas}
-ssp_pr_dict = {'SSP2_raw': ssp2_pr_raw, 'SSP2_adjusted': ssp2_pr, 'SPP5_raw': ssp5_pr_raw, 'SSP5_adjusted': ssp5_pr}
-
 # Temperature:
-cmip_plot_ensemble(ssp_tas_dict, era5['temp'], intv_mean='Y')
+# cmip_plot_ensemble(ssp_tas_dict, era5['temp'], intv_mean='Y')
 
 # Precipitation:
-cmip_plot_ensemble(ssp_pr_dict, era5['prec'], precip=True, intv_sum='Y', intv_mean='Y')
+# cmip_plot_ensemble(ssp_pr_dict, era5['prec'], precip=True, intv_sum='Y', intv_mean='Y')
 
 ## Violin plots
 
 # Rearrange dictionaries for two-column display
 tas_raw = {'SSP2': ssp2_tas_raw, 'SSP5': ssp5_tas_raw}
 tas_adjusted = {'SSP2': ssp2_tas, 'SSP5': ssp5_tas}
+pr_raw = {'SSP2': ssp2_pr_raw, 'SSP5': ssp5_pr_raw}
+pr_adjusted = {'SSP2': ssp2_pr, 'SSP5': ssp5_pr}
 
-for i in tas_raw.keys():
-    tas_raw[i] = tas_raw[i].loc[slice('1979-01-01', '2015-12-31')].copy()
-    tas_raw[i]['ERA5L'] = era5['temp'][slice('1979-01-01', '2015-12-31')]
+def vplots(before, after, target, target_label='Target', precip=False, show=False):
+    """Plots violin plots of the kernel density estimation for all models before and after bias adjustment."""
 
-for i in tas_adjusted.keys():
-    tas_adjusted[i] = tas_adjusted[i].loc[slice('1979-01-01', '2015-12-31')].copy()
-    tas_adjusted[i]['ERA5L'] = era5['temp'][slice('1979-01-01', '2015-12-31')]
+    period = slice('1979-01-01', '2022-12-31')
+    if precip:
+        var = 'prec'
+        var_label = 'Annual Precipitation'
+        unit = ' [mm]'
+    else:
+        var = 'temp'
+        var_label = 'Mean Annual Air Temperature'
+        unit = ' [K]'
+    for i in before.keys():
+        before[i] = before[i].loc[period].copy()
+        before[i][target_label] = target[var][period]
 
-fig = plt.figure(figsize=(20, 20))
-outer = fig.add_gridspec(1, 2)
+    for i in after.keys():
+        after[i] = after[i].loc[period].copy()
+        after[i][target_label] = target[var][period]
 
-inner = outer[0].subgridspec(2, 1)
-axis = inner.subplots(sharex='col')
+    fig = plt.figure(figsize=(20, 20))
+    outer = fig.add_gridspec(1, 2)
+    inner = outer[0].subgridspec(2, 1)
+    axis = inner.subplots(sharex='col')
 
-# Calculate total range of all input datasets
-all_data = pd.concat([df2long(tas_raw[i]) for i in tas_raw.keys()] + [df2long(tas_adjusted[i]) for i in tas_adjusted.keys()])
-xmin, xmax = all_data['t2m'].min(), all_data['t2m'].max()
+    all_data = pd.concat([df2long(before[i], precip=precip, intv_sum='Y') for i in before.keys()] +
+                         [df2long(after[i], precip=precip, intv_sum='Y') for i in after.keys()])
+    xmin, xmax = all_data[var].min(), all_data[var].max()
 
-for (i, k) in zip(tas_raw.keys(), range(0, 4, 1)):
-    df = df2long(tas_raw[i])
-    axis[k].grid()
-    sns.violinplot(ax=axis[k], x='t2m', y='model', data=df, scale="count", bw=.2)
-    axis[k].set(xlim=(xmin-1, xmax+1))
-    axis[k].set_ylabel(i, fontsize=18, fontweight='bold')
-    if k == 0:
-        axis[k].set_title('Before Scaled Distribution Mapping', fontweight='bold', fontsize=18)
-plt.xlabel('Air Temperature [K]')
+    if precip:
+        xlim = (xmin * 0.95, xmax * 1.05)
+    else:
+        xlim = (xmin - 1, xmax +1 )
 
-inner = outer[1].subgridspec(2, 1)
-axis = inner.subplots(sharex='col')
-for (i, k) in zip(tas_adjusted.keys(), range(0, 4, 1)):
-    df = df2long(tas_adjusted[i])
-    axis[k].grid()
-    sns.violinplot(ax=axis[k], x='t2m', y='model', data=df, scale="count", bw=.2)
-    axis[k].set(xlim=(xmin-1, xmax+1))
-    axis[k].set_ylabel(i, fontsize=18, fontweight='bold')
-    axis[k].get_yaxis().set_visible(False)
-    if k == 0:
-        axis[k].set_title('After Scaled Distribution Mapping', fontweight='bold', fontsize=18)
-plt.xlabel('Air Temperature [K]')
+    for (i, k) in zip(before.keys(), range(0, 4, 1)):
+        df = df2long(before[i], precip=precip, intv_sum='Y')
+        axis[k].grid()
+        sns.violinplot(ax=axis[k], x=var, y='model', data=df, scale="count", bw=.2)
+        axis[k].set(xlim=xlim)
+        axis[k].set_ylabel(i, fontsize=18, fontweight='bold')
+        if k == 0:
+            axis[k].set_title('Before Scaled Distribution Mapping', fontweight='bold', fontsize=18)
+    plt.xlabel(var_label + unit)
 
-fig.suptitle('Kernel Density Estimation of Mean Annual Air Temperature (1982-2020)', fontweight='bold', fontsize=20)
-fig.tight_layout()
-fig.subplots_adjust(top=0.93)
-plt.show()
+    inner = outer[1].subgridspec(2, 1)
+    axis = inner.subplots(sharex='col')
+    for (i, k) in zip(after.keys(), range(0, 4, 1)):
+        df = df2long(after[i], precip=precip, intv_sum='Y')
+        axis[k].grid()
+        sns.violinplot(ax=axis[k], x=var, y='model', data=df, scale="count", bw=.2)
+        axis[k].set(xlim=xlim)
+        axis[k].set_ylabel(i, fontsize=18, fontweight='bold')
+        axis[k].get_yaxis().set_visible(False)
+        if k == 0:
+            axis[k].set_title('After Scaled Distribution Mapping', fontweight='bold', fontsize=18)
+    plt.xlabel(var_label + unit)
+
+    starty = period.start.split('-')[0]
+    endy = period.stop.split('-')[0]
+    fig.suptitle('Kernel Density Estimation of ' + var_label + ' (' + starty + '-' + endy + ')',
+                 fontweight='bold', fontsize=20)
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.93)
+    if show:
+        plt.show()
+
+
+# vplots(tas_raw, tas_adjusted, era5, target_label='ERA5-Land', show=True)
+# vplots(pr_raw, pr_adjusted, era5, target_label='ERA5-Land', precip=True, show=True)
+
 
 ## Probability plots
-import pandas as pd
-import matplotlib.pyplot as plt
-import scipy.stats as stats
 
-fig, axs = plt.subplots(7, 5, figsize=(20, 20))
-
-for i, col in enumerate(ssp2_tas_raw.columns):
-    row, colax = divmod(i, 5)
-    ax = axs[row, colax]
-
-    raw_data = ssp2_tas_raw[col].dropna()
-    adjusted_data = ssp2_tas[col].dropna()
-
-    stats.probplot(raw_data, plot=ax, rvalue=True)
-    ax.get_lines()[1].set_markerfacecolor('b')          # Seems to have no effect
-    ax.get_lines()[0].set_markersize(4.0)
-    stats.probplot(adjusted_data, plot=ax, rvalue=True)
-
-    ax.set_title(col)
-
-plt.tight_layout()
-plt.show()
-
-## BESSER ALS DIE DAVOR ABER BRUAHCT NOCH LINIEN, SCORES (R2) UND MUSS LOOPEN.
 import probscale
+import matplotlib.pyplot as plt
 
-def prob_plot(original, target, corrected, title=None, ylabel="Temperature [C]", **kwargs):
-    fig, ax = plt.subplots(sharex=True, sharey=True)
+
+def prob_plot(original, target, corrected, ax, title=None, ylabel="Temperature [K]", **kwargs):
+    """Combines probability plots of climate model data before and after bias adjustment and the target data. """
+
     scatter_kws = dict(label="", marker=None, linestyle="-")
     common_opts = dict(plottype="qq", problabel="", datalabel="", **kwargs)
 
@@ -510,21 +536,56 @@ def prob_plot(original, target, corrected, title=None, ylabel="Temperature [C]",
     scatter_kws["label"] = "target"
     fig = probscale.probplot(target, ax=ax, scatter_kws=scatter_kws, **common_opts)
 
-    scatter_kws["label"] = "corrected"
+    scatter_kws["label"] = "adjusted"
     fig = probscale.probplot(corrected, ax=ax, scatter_kws=scatter_kws, **common_opts)
+
     ax.set_title(title)
-    ax.legend()
 
     ax.set_xlabel("Standard Normal Quantiles")
     ax.set_ylabel(ylabel)
-    fig.tight_layout()
+    ax.grid(True)
+
+    score = round(target.corr(corrected), 2)
+    ax.text(0.05, 0.8, f"R² = {score}", transform=ax.transAxes, fontsize=15)
+
+    return fig
 
 
+def pp_matrix(original, target, corrected, nrow=7, ncol=5, precip=False, show=False):
+    """Arranges the prob_plots of all CMIP6 models in a matrix and adds the R² score."""
 
-original = ssp2_tas_raw['ACCESS-CM2']['1979-01-01': '2015-12-31']
-target = era5['1979-01-01': '2015-12-31']['temp']
-adjusted = ssp2_tas['ACCESS-CM2']['1979-01-01': '2015-12-31']
+    period = slice('1979-01-01', '2022-12-31')
+    if precip:
+        var = 'Precipitation'
+        var_label = 'Monthly ' + var
+        unit = ' [mm]'
+        original = original.resample('M').sum()
+        target = target.resample('M').sum()
+        corrected = corrected.resample('M').sum()
+    else:
+        var = 'Temperature'
+        var_label = 'Daily Mean ' + var
+        unit = ' [K]'
 
-prob_plot(original, target, adjusted)
+    fig = plt.figure(figsize=(16, 16))
 
-plt.show()
+    for i, col in enumerate(ssp2_tas.columns):
+        ax = plt.subplot(nrow, ncol, i + 1)
+        prob_plot(original[col][period], target[period],
+                  corrected[col][period], ax=ax, ylabel=var + unit)
+        ax.set_title(col, fontweight='bold')
+
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, ['original (CMIP6 raw)', 'target (ERA5-Land)', 'adjusted (CMIP6 after SDM)'], loc='lower right', bbox_to_anchor=(0.96, 0.024), fontsize=20)
+    plt.tight_layout()
+    fig.subplots_adjust(hspace=0.7, wspace=0.4)
+    starty = period.start.split('-')[0]
+    endy = period.stop.split('-')[0]
+    fig.suptitle('Probability Plots of CMIP6 ' + var_label + ' (' + starty + '-' + endy + ')',
+                 fontweight='bold', fontsize=20)
+    plt.subplots_adjust(top=0.93)
+    if show:
+        plt.show()
+
+pp_matrix(ssp2_tas_raw, era5['temp'], ssp2_tas, show=True)
+pp_matrix(ssp2_pr_raw, era5['prec'], ssp2_pr, precip=True, show=True)

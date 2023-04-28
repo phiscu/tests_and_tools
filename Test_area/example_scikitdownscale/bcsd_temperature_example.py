@@ -6,7 +6,7 @@ import sys
 import os
 from skdownscale.pointwise_models import BcsdTemperature
 
-os.chdir(sys.path[0])
+os.getcwd()
 
 obs = pd.read_csv('obs.csv', index_col='time', parse_dates=['time'])
 reanalysis = pd.read_csv('reanalysis.csv', index_col='time', parse_dates=['time'])

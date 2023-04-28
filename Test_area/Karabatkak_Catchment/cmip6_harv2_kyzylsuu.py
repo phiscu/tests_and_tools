@@ -57,6 +57,9 @@ for s in scen:
         input_path + cmip_path + 'tp_CMIP6_all_models_raw_42.516-79.0167_1982-01-01-2100-12-31_'
         + name + '.csv', index_col='time', parse_dates=['time'])
 
+cmip_mod_pr['ssp2']['1979-01-01': '2021-12-31'].describe().transpose().describe()
+har['1979-01-01': '2021-12-31'].describe()
+
 ## Bias adjustment:
 
 # Training data choice:

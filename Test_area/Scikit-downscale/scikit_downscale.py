@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 import sys
 home = str(Path.home()) + '/Seafile/Ana-Lena_Phillip/data'
-wd = home + '/scripts/Test_area/Scikit-downscale'
+wd = home + '/tests_and_tools/Test_area/Scikit-downscale'
 import os
 os.chdir(wd)
 sys.path.append(wd)
@@ -29,7 +29,7 @@ train_slice = slice('1980-01-01', '1989-12-31')
 predict_slice = slice('1990-01-01', '1999-12-31')
 
 # print a table of the training/targets data
-display(pd.concat({'training': training, 'targets': targets}, axis=1))
+# display(pd.concat({'training': training, 'targets': targets}, axis=1))
 
 # plot temperature and precipitation data
 plot_slice = slice('1990-01-01', '1990-12-31')
@@ -71,9 +71,13 @@ predict_df = pd.DataFrame(index = X_predict.index)
 
 for key, model in models.items():
     predict_df[key] = model.predict(X_predict)
+    # print(key)
+    # print(model)
+#
+PureAnalog(n_analogs=1).predict(X_predict)
 
 # show a table of the predicted data
-display(predict_df.head())
+# display(predict_df.head())
 
 fig, ax = plt.subplots(figsize=(10,5))
 targets['tmax'][plot_slice].plot(ax=ax, label='target', c='k', lw=1, alpha=0.75, legend=True, zorder=10)
@@ -88,7 +92,7 @@ plt.show()
 
 # calculate r2
 score = (predict_df.corrwith(targets.tmax[predict_slice]) **2).sort_values().to_frame('r2_score')
-display(score)
+# display(score)
 
 fig = prob_plots(X_predict, targets['tmax'], predict_df[score.index.values], shape=(3, 3), figsize=(12, 12))
 plt.show()
