@@ -146,10 +146,10 @@ catchment_new = gpd.read_file(output_gpkg, layer='catchment_new')
 catchment = geemap.geopandas_to_ee(catchment_new)
 
 cmip_dir = wd + '/matilda_edu/output/' + 'cmip6/'
-downloader_t = CMIPDownloader(var='tas', starty=1979, endy=2100, shape=catchment, processes=30, dir=cmip_dir)
-downloader_t.download()
-downloader_p = CMIPDownloader(var='pr', starty=1979, endy=2100, shape=catchment, processes=30, dir=cmip_dir)
-downloader_p.download()
+# downloader_t = CMIPDownloader(var='tas', starty=1979, endy=2100, shape=catchment, processes=30, dir=cmip_dir)
+# downloader_t.download()
+# downloader_p = CMIPDownloader(var='pr', starty=1979, endy=2100, shape=catchment, processes=30, dir=cmip_dir)
+# downloader_p.download()
 
 
 ## Class to pre-process the downloaded files
@@ -309,21 +309,17 @@ ssp_pr_dict = {'SSP2_raw': ssp2_pr_raw, 'SSP2_adjusted': ssp2_pr, 'SSP5_raw': ss
 ## Timeseries plots
 import matplotlib.pyplot as plt
 
-
-def cmip_plot(ax, df, title, target, precip=False, intv_sum='M', intv_mean='10Y',
+def cmip_plot(ax, df, title, target, precip=False, intv_sum='M', intv_mean='Y',
               target_label='Target', show_target_label=False):
     """Resamples and plots climate model and target data."""
 
     if not precip:
-        ax.plot(df.resample(intv_mean).mean().iloc[:, :-1], linewidth=0.6)
-        ax.plot(df.resample(intv_mean).mean().iloc[:, -1], linewidth=1, c='black')
+        ax.plot(df.resample(intv_mean).mean().iloc[:, :], linewidth=1.2)
         era_plot, = ax.plot(target['temp'].resample(intv_mean).mean(), linewidth=1.5, c='red', label=target_label,
                             linestyle='dashed')
     else:
-        ax.plot(df.resample(intv_sum).sum().resample(intv_mean).mean().iloc[:, :-1],
-                linewidth=0.6)
-        ax.plot(df.resample(intv_sum).sum().resample(intv_mean).mean().iloc[:, -1],
-                linewidth=1, c='black')
+        ax.plot(df.resample(intv_sum).sum().resample(intv_mean).mean().iloc[:, :],
+                linewidth=1.2)
         era_plot, = ax.plot(target['prec'].resample(intv_sum).sum().resample(intv_mean).mean(), linewidth=1.5,
                             c='red', label=target_label, linestyle='dashed')
     if show_target_label:
@@ -332,7 +328,7 @@ def cmip_plot(ax, df, title, target, precip=False, intv_sum='M', intv_mean='10Y'
     ax.grid(True)
     
 
-def cmip_plot_combined(data, target, title, precip=False, intv_sum='M', intv_mean='10Y',
+def cmip_plot_combined(data, target, title, precip=False, intv_sum='M', intv_mean='Y',
                        target_label='Target', show=False):
     """Combines multiple subplots of climate data in different scenarios before and after bias adjustment.
     Shows target data for comparison"""
@@ -366,11 +362,130 @@ def cmip_plot_combined(data, target, title, precip=False, intv_sum='M', intv_mea
         if show:
             plt.show()
 
-# cmip_plot_combined(data=ssp_tas_dict, target=era5, title='10y Mean of Air Temperature', target_label='ERA5-Land', show=True)
-# cmip_plot_combined(data=ssp_pr_dict, target=era5, title='Mean of Monthly Precipitation', precip=True, target_label='ERA5-Land', show=True)
+cmip_plot_combined(data=ssp_tas_dict, target=era5, title='10y Mean of Air Temperature', target_label='ERA5-Land', show=True, intv_mean='Y')
+cmip_plot_combined(data=ssp_pr_dict, target=era5, title='Mean of Monthly Precipitation', precip=True, target_label='ERA5-Land', show=True)
 
 # ZWEI AUSREIẞER BEI DEN TEMPERATUREN
 # ERA5 NIEDERSCHLAG CA. 4 MAL SO HOCH WIE CMIP. FEHLER? BEI ECMWF DATEN GENAUSO?
+
+## Use plotly to identify problematic columns
+import plotly.express as px
+
+fig = px.line(ssp5_tas_raw.resample('Y').mean())
+fig.show(renderer="browser")
+
+## Check for outliers and jumps
+
+class DataFilter:
+    def __init__(self, df, zscore_threshold=3, resampling_rate=None, prec=False, jump_threshold=5):
+        self.df = df
+        self.zscore_threshold = zscore_threshold
+        self.resampling_rate = resampling_rate
+        self.prec = prec
+        self.jump_threshold = jump_threshold
+        self.all_filtered()
+
+
+    def check_outliers(self):
+        """
+        A function for filtering a pandas dataframe for columns with obvious outliers
+        and dropping them based on a z-score threshold.
+
+        Returns
+        -------
+        models : list
+            A list of columns identified as having outliers.
+        """
+        # Resample if rate specified
+        if self.resampling_rate is not None:
+            if self.prec:
+                self.df = self.df.resample(self.resampling_rate).sum()
+            else:
+                self.df = self.df.resample(self.resampling_rate).mean()
+
+        # Calculate z-scores for each column
+        z_scores = pd.DataFrame((self.df - self.df.mean()) / self.df.std())
+
+        # Identify columns with at least one outlier (|z-score| > threshold)
+        cols_with_outliers = z_scores.abs().apply(lambda x: any(x > self.zscore_threshold))
+        self.outliers = list(self.df.columns[cols_with_outliers])
+
+        # Return the list of columns with outliers
+        return self.outliers
+
+    def check_jumps(self):
+        """
+        A function for checking a dataframe for columns with sudden jumps or drops
+        in temperature and returning a list of the columns that have them.
+
+        Returns
+        -------
+        jumps : list
+            A list of columns identified as having sudden jumps or drops.
+        """
+        cols = self.df.columns
+        jumps = []
+
+        for col in cols:
+            diff = self.df[col].diff()
+            if (abs(diff) > self.jump_threshold).any():
+                jumps.append(col)
+
+        self.jumps = jumps
+        return self.jumps
+
+    def all_filtered(self):
+        """
+        A function for filtering a dataframe for columns with obvious outliers
+        or sudden jumps or drops in temperature, and returning a list of the
+        columns that have been filtered using either or both methods.
+
+        Returns
+        -------
+        filtered_cols : list
+            A list of columns identified as having outliers or sudden jumps/drops in temperature.
+        """
+        self.check_outliers()
+        self.check_jumps()
+        self.filtered_models = list(set(self.outliers) | set(self.jumps))
+        return self.filtered_models
+
+
+def drop_model(col_names, dict_of_dfs):
+    """
+    Drop columns with given names from all dataframes in a dictionary.
+    Parameters
+    ----------
+    col_names : list of str
+        The list of column names to drop.
+    dict_of_dfs : dict of pandas.DataFrame
+        The dictionary of dataframes.
+    Returns
+    -------
+    dict_of_dfs : dict of pandas.DataFrame
+        The updated dictionary of dataframes with dropped columns.
+    """
+    for key in dict_of_dfs.keys():
+        # Only update dataframes that have the columns to drop
+        if all(col_name in dict_of_dfs[key].columns for col_name in col_names):
+            dict_of_dfs[key] = dict_of_dfs[key].drop(columns=col_names)
+    return dict_of_dfs
+
+## Apply filters
+filter = DataFilter(ssp5_tas_raw, zscore_threshold=3, jump_threshold=5, resampling_rate='Y')
+print(filter.outliers)
+print(filter.jumps)
+print(filter.filtered_models)
+
+
+ssp_tas_dict = drop_model(filter.filtered_models, ssp_tas_dict)
+ssp_pr_dict = drop_model(filter.filtered_models, ssp_pr_dict)
+
+
+
+# FILTER AUCH AUF DIE ANDEREN DICT ÜBERTRAGEN (ALSO GGF. AN DEN ORIGINAL DF DURCHFÜHREN)
+# FILTER GGF. WEITER NACH UNTEN IM WORKFLOW (ZB NACH VPLOTS)
+
 
 ##
 import matplotlib.pyplot as plt
@@ -440,8 +555,8 @@ def cmip_plot_ensemble(cmip, era, precip=False, intv_sum='M', intv_mean='Y', fig
         plt.show()
     warnings.filterwarnings(action='always')
 
-# cmip_plot_ensemble(ssp_tas_dict, era5['temp'], intv_mean='Y')
-# cmip_plot_ensemble(ssp_pr_dict, era5['prec'], precip=True, intv_sum='Y', intv_mean='Y')
+cmip_plot_ensemble(ssp_tas_dict, era5['temp'], intv_mean='Y')
+cmip_plot_ensemble(ssp_pr_dict, era5['prec'], precip=True, intv_sum='Y', intv_mean='Y')
 
 ## Violin plots
 
@@ -518,8 +633,8 @@ def vplots(before, after, target, target_label='Target', precip=False, show=Fals
         plt.show()
 
 
-# vplots(tas_raw, tas_adjusted, era5, target_label='ERA5-Land', show=True)
-# vplots(pr_raw, pr_adjusted, era5, target_label='ERA5-Land', precip=True, show=True)
+vplots(tas_raw, tas_adjusted, era5, target_label='ERA5-Land', show=True)
+vplots(pr_raw, pr_adjusted, era5, target_label='ERA5-Land', precip=True, show=True)
 
 
 ## Probability plots
