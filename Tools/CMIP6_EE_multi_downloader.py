@@ -12,7 +12,7 @@ from tqdm import tqdm
 try:
     ee.Initialize()
 except Exception as e:
-    ee.Authenticate()         # authenticate when using GEE for the first time
+    ee.Authenticate()
     ee.Initialize()
 
 """
@@ -50,6 +50,9 @@ class CMIPDownloader:
     def download(self):
         """Runs a subset routine for CMIP6 data on GEE servers to create ee.FeatureCollections for all years in
         the requested period. Downloads individual years in parallel processes to increase the download time."""
+
+        print('Initiating download request for NEX-GDDP-CMIP6 data from ' +
+              str(self.starty) + ' to ' + str(self.endy) + '.')
 
         def getRequests(starty, endy):
             """Generates a list of years to be downloaded. [Client side]"""
@@ -143,10 +146,10 @@ catchment_new = gpd.read_file(output_gpkg, layer='catchment_new')
 catchment = geemap.geopandas_to_ee(catchment_new)
 
 cmip_dir = wd + '/matilda_edu/output/' + 'cmip6/'
-# downloader_t = CMIPDownloader('tas', 1979, 2100, catchment, processes=30, dir=cmip_dir)
-# downloader_t.download()
-# downloader_p = CMIPDownloader('pr', 1979, 2100, catchment, processes=30, dir=cmip_dir)
-# downloader_p.download()
+downloader_t = CMIPDownloader(var='tas', starty=1979, endy=2100, shape=catchment, processes=30, dir=cmip_dir)
+downloader_t.download()
+downloader_p = CMIPDownloader(var='pr', starty=1979, endy=2100, shape=catchment, processes=30, dir=cmip_dir)
+downloader_p.download()
 
 
 ## Class to pre-process the downloaded files
@@ -261,6 +264,7 @@ era5_file = wd + '/matilda_edu/output/ERA5L.csv'
 def read_era5l(file):
     """Reads ERA5-Land data, drops redundant columns, and adds DatetimeIndex.
     Resamples the dataframe to reduce the DatetimeIndex to daily resolution."""
+
     return pd.read_csv(file, **{
         'usecols':      ['temp', 'prec', 'dt'],
         'index_col':    'dt',
@@ -269,12 +273,13 @@ def read_era5l(file):
 def adjust_bias(predictand, predictor, method='normal_mapping'):
     """Applies scaled distribution mapping to all passed climate projections (predictand)
      based on a predictor timeseries."""
+
     predictor = read_era5l(predictor)
     if predictand.mean().mean() > 100:
         var = 'temp'
     else:
         var = 'prec'
-    training_period = slice('1979-01-01', '2014-12-31')
+    training_period = slice('1979-01-01', '2022-12-31')
     prediction_period = slice('1979-01-01', '2100-12-31')
     corr = pd.DataFrame()
     for m in predictand.columns:
@@ -286,10 +291,11 @@ def adjust_bias(predictand, predictor, method='normal_mapping'):
 
     return corr
 
-ssp2_tas = adjust_bias(ssp2_tas_raw, era5_file)
-ssp5_tas = adjust_bias(ssp5_tas_raw, era5_file)
-ssp2_pr = adjust_bias(ssp2_pr_raw, era5_file)
-ssp5_pr = adjust_bias(ssp5_pr_raw, era5_file)
+##
+ssp2_tas = adjust_bias(predictand=ssp2_tas_raw, predictor=era5_file)
+ssp5_tas = adjust_bias(predictand=ssp5_tas_raw, predictor=era5_file)
+ssp2_pr = adjust_bias(predictand=ssp2_pr_raw, predictor=era5_file)
+ssp5_pr = adjust_bias(predictand=ssp5_pr_raw, predictor=era5_file)
 
 era5 = read_era5l(era5_file)
 
@@ -307,6 +313,7 @@ import matplotlib.pyplot as plt
 def cmip_plot(ax, df, title, target, precip=False, intv_sum='M', intv_mean='10Y',
               target_label='Target', show_target_label=False):
     """Resamples and plots climate model and target data."""
+
     if not precip:
         ax.plot(df.resample(intv_mean).mean().iloc[:, :-1], linewidth=0.6)
         ax.plot(df.resample(intv_mean).mean().iloc[:, -1], linewidth=1, c='black')
@@ -359,8 +366,8 @@ def cmip_plot_combined(data, target, title, precip=False, intv_sum='M', intv_mea
         if show:
             plt.show()
 
-# cmip_plot_combined(ssp_tas_dict, era5, '10y Mean of Air Temperature', target_label='ERA5-Land', show=True)
-# cmip_plot_combined(ssp_pr_dict, era5, 'Mean of Monthly Precipitation', precip=True, target_label='ERA5-Land', show=True)
+# cmip_plot_combined(data=ssp_tas_dict, target=era5, title='10y Mean of Air Temperature', target_label='ERA5-Land', show=True)
+# cmip_plot_combined(data=ssp_pr_dict, target=era5, title='Mean of Monthly Precipitation', precip=True, target_label='ERA5-Land', show=True)
 
 # ZWEI AUSREIẞER BEI DEN TEMPERATUREN
 # ERA5 NIEDERSCHLAG CA. 4 MAL SO HOCH WIE CMIP. FEHLER? BEI ECMWF DATEN GENAUSO?
@@ -433,10 +440,7 @@ def cmip_plot_ensemble(cmip, era, precip=False, intv_sum='M', intv_mean='Y', fig
         plt.show()
     warnings.filterwarnings(action='always')
 
-# Temperature:
 # cmip_plot_ensemble(ssp_tas_dict, era5['temp'], intv_mean='Y')
-
-# Precipitation:
 # cmip_plot_ensemble(ssp_pr_dict, era5['prec'], precip=True, intv_sum='Y', intv_mean='Y')
 
 ## Violin plots
@@ -448,7 +452,7 @@ pr_raw = {'SSP2': ssp2_pr_raw, 'SSP5': ssp5_pr_raw}
 pr_adjusted = {'SSP2': ssp2_pr, 'SSP5': ssp5_pr}
 
 def vplots(before, after, target, target_label='Target', precip=False, show=False):
-    """Plots violin plots of the kernel density estimation for all models before and after bias adjustment."""
+    """Creates violin plots of the kernel density estimation for all models before and after bias adjustment."""
 
     period = slice('1979-01-01', '2022-12-31')
     if precip:
