@@ -917,9 +917,18 @@ def pickle_to_dict(file_path):
     return dic
 
 
-dict_to_pickle(ssp_tas_dict, '/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/cmip6/adjusted/ssp_tas_dict.pickle')
-dict_to_pickle(ssp_pr_dict, '/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/cmip6/adjusted/ssp_pr_dict.pickle')
+
+tas = dict_filter(ssp_tas_dict, 'adjusted')
+pr = dict_filter(ssp_pr_dict, 'adjusted')
+
+
+
+
+dict_to_pickle(tas, '/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/cmip6/adjusted/tas.pickle')
+dict_to_pickle(pr, '/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/cmip6/adjusted/pr.pickle')
 
 # ssp_tas_dict = pickle_to_dict('/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/cmip6/adjusted/ssp_tas_dict.pickle')
 # ssp_pr_dict = pickle_to_dict('/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/cmip6/adjusted/ssp_pr_dict.pickle')
 
+
+# I have two dictionaries 'tas' and 'pr' containing temperature and precipitation data respectively. Both contain two dataframes (SSP2 and SSP5 for two scenarios) with the same names and the same columns. I would like to merge the dicts into a dictionary of dictionaries
