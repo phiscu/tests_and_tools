@@ -53,6 +53,23 @@ def pickle_to_dict(file_path):
 
 
 def cmip2df(temp, prec, scen, col):
+    """
+    Converts temperature and precipitation data from a CMIP model output dictionary into a Pandas DataFrame.
+    Parameters
+    ----------
+    temp : dict
+        dictionary of temperature data from a CMIP model
+    prec : dict
+        dictionary of precipitation data from a CMIP model
+    scen : str
+        name of the scenario (e.g. RCP4.5)
+    col : str
+        name of the column containing data for the scenario (e.g. tas)
+    Returns:
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the temperature and precipitation data for the given scenario and column
+    """
     df = pd.DataFrame({'T2': temp[scen][col], 'RRR': prec[scen][col]}).reset_index()
     df.columns = ['TIMESTAMP', 'T2', 'RRR']
     return df
@@ -278,13 +295,13 @@ class MatildaBulkProcessor:
 
 
 # Usage
-matilda_bulk = MatildaBulkProcessor(scenarios, matilda_settings, param_dict)
+# matilda_bulk = MatildaBulkProcessor(scenarios, matilda_settings, param_dict)
 # matilda_scenarios = matilda_bulk.run_single_process()
-matilda_scenarios = matilda_bulk.run_multi_process()
+# matilda_scenarios = matilda_bulk.run_multi_process()
 
-dict_to_pickle(matilda_scenarios, test_dir + 'adjusted/matilda_scenarios.pickle')
+# dict_to_pickle(matilda_scenarios, test_dir + 'adjusted/matilda_scenarios.pickle')
 
-# matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
+matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
 
 ## Create custom dataframes for analysis
 
@@ -365,16 +382,184 @@ def custom_df(dic, scenario, var, resample_freq=None):
     return combined_df
 
 
-custom_df(matilda_scenarios, scenario='SSP5', var='smb_water_year', resample_freq='Y')
+# custom_df(matilda_scenarios, scenario='SSP5', var='smb_water_year', resample_freq='Y')
 
 
 ## Plot example
 import matplotlib.pyplot as plt
 
-combined_df = custom_df(matilda_scenarios, scenario='SSP5', var='runoff_from_glaciers', resample_freq='10Y')
-# Create the line plot
-combined_df.plot()
-plt.xlabel('x-axis label')
-plt.ylabel('y-axis label')
-plt.title('Title of the plot')
-plt.show()
+# combined_df = custom_df(matilda_scenarios, scenario='SSP5', var='runoff_from_glaciers', resample_freq='10Y')
+# # Create the line plot
+# combined_df.plot()
+# plt.xlabel('x-axis label')
+# plt.ylabel('y-axis label')
+# plt.title('Title of the plot')
+# plt.show()
+
+
+
+## Explore the dataset
+
+# import plotly.express as px
+# import plotly.graph_objects as pxg
+# import plotly.io as pio
+# pio.renderers.default = "browser"
+#
+# df = custom_df(matilda_scenarios, scenario='SSP5', var='glacier_area', resample_freq='Y')
+#
+# plot = pxg.Figure(data=[pxg.layout.shape.Line(
+#     y=df[:])
+# ])
+#
+# plot.show()
+#
+#
+#
+#
+#
+#
+# ##
+# import plotly.graph_objs as go
+# from plotly.subplots import make_subplots
+# import dash
+# from dash import dcc
+# from dash import html
+# from dash.dependencies import Input, Output
+#
+# # Initial data for the line chart
+# line_chart_data = []
+# for col in df.columns:
+#     trace = go.Scatter(x=df['x'], y=df[col], mode='lines', name=col)
+#     line_chart_data.append(trace)
+#
+# # Create a subplot for the dropdown menu
+# dropdown_options = [{'label': 'Option 1', 'value': 'option1'},
+#                     {'label': 'Option 2', 'value': 'option2'},
+#                     {'label': 'Option 3', 'value': 'option3'}]
+# dropdown_menu = go.Dropdown(options=dropdown_options, value='option1', id='param-selector')
+#  # Create a subplot for the line chart
+# fig = make_subplots(rows=2, cols=1, vertical_spacing=0.08, subplot_titles=['Line Chart', 'Dropdown Menu'])
+# fig.add_trace(line_chart_data, row=1, col=1)
+# fig.add_trace(dropdown_menu, row=2, col=1)
+#
+# # Define the callback function for the dropdown menu
+# @app.callback(
+#     Output(component_id='line-chart', component_property='figure'),
+#     [Input(component_id='param-selector', component_property='value')]
+# )
+# def update_chart(arg):
+#     df = custom_df(arg)
+#     data = []
+#     for col in df.columns:
+#         trace = go.Scatter(x=df['x'], y=df[col], mode='lines', name=col)
+#         data.append(trace)
+#     fig = {'data': data,
+#            'layout': go.Layout(xaxis={'title': 'X-axis'},
+#                                yaxis={'title': 'Y-axis'},
+#                                title='Line Chart')}
+#     return fig
+# # Update the layout of the plot with the dropdown menu
+# fig.update_layout(updatemenus=[{'type': 'dropdown',
+#                                 'buttons': [{'label': 'Option 1', 'method': 'update', 'args': [{'visible': [True, False]},
+#                                                                                               {'title': 'Line Chart'}]},
+#                                             {'label': 'Option 2', 'method': 'update', 'args': [{'visible': [False, True]},
+#                                                                                               {'title': 'Line Chart'}]},
+#                                             {'label': 'Option 3', 'method': 'update', 'args': [{'visible': [False, False, True]},
+#                                                                                               {'title': 'Line Chart'}]}]}])
+#
+# # Display the plot
+# fig.show()
+#
+# ##
+#
+# import plotly.express as px
+# import pandas as pd
+# import plotly.graph_objs as go
+# from plotly.subplots import make_subplots
+# from dash.dependencies import Input, Output
+#
+#
+# df = custom_df(matilda_scenarios, scenario='SSP5', var='total_runoff', resample_freq='Y')
+#
+# fig = make_subplots(rows=2, cols=1, vertical_spacing=0.08, subplot_titles=("Line Chart", "Dropdown Menu"))
+# dropdown_options = [{'label': 'Glacier Area', 'value': 'glacier_area'},
+#                    {'label': 'Total Runoff', 'value': 'total_runoff'},
+#                    {'label': 'SMB', 'value': 'SMB'}]
+#
+# fig.add_trace(go.Dropdown(options=dropdown_options, value='total_runoff', id='param-selector'), row=2, col=1)
+#
+# @app.callback(Output('line_chart_id', 'data'),
+#               [Input('param-selector', 'value')])
+# def update_chart(arg):
+#     df = custom_df(matilda_scenarios, scenario='SSP5', var=arg, resample_freq='Y')
+#     line_chart_data['x'] = df.index
+#     line_chart_data['y'] = df['ACCESS-CM2']
+#     return line_chart_data
+#
+# initial_df = custom_df('total_runoff')
+# line_chart_data = {'x': initial_df.index,
+#                   'y': initial_df['ACCESS-CM2'],
+#                   'type': 'line'}
+# fig.add_trace(go.Scatter(line_chart_data), row=1, col=1)
+#
+# fig.show()
+
+
+##
+
+import plotly.express as px
+import dash
+from dash import dcc
+from dash import html
+from dash.dependencies import Input, Output
+import plotly.io as pio
+pio.renderers.default = "browser"
+
+
+app = dash.Dash()
+
+# Create the initial line plot
+df = custom_df(matilda_scenarios, scenario='SSP5', var='glacier_area', resample_freq='Y')
+fig = px.line(df)
+
+# Add all columns to the line plot
+# for column in df.columns:
+#     fig.add_trace(px.line(df, x=df.index, y=df.[column]).data[0])
+
+# fig.show()
+
+# Define the list of arguments for custom_df()
+args = ['glacier_area', 'total_runoff', 'SMB']
+
+# Create the callback function
+@app.callback(
+    Output('line-plot', 'figure'),
+    Input('arg-dropdown', 'value'))
+def update_figure(selected_arg):
+    # Generate the new dataframe based on the selected argument
+    new_df = custom_df(matilda_scenarios, scenario='SSP5', var=selected_arg, resample_freq='Y')
+    # Update the line plot with the new data for all columns
+    fig.data = []
+    fig.add_trace(px.line(new_df).data[0])
+    for column in new_df.columns:
+        fig.add_trace(px.line(new_df, x=df.index, y=df[column]).data[0])
+    return fig
+
+# Define the dropdown menu
+arg_dropdown = dcc.Dropdown(
+    id='arg-dropdown',
+    options=[{'label': arg, 'value': arg} for arg in args],
+    value=args[0])
+
+# Add the dropdown menu to the layout
+app.layout = html.Div([
+    arg_dropdown,
+    dcc.Graph(id='line-plot', figure=fig)])
+
+# Run the app
+
+app.run_server(debug=True, use_reloader=False)  # Turn off reloader if inside Jupyter
+
+
+
+
