@@ -128,9 +128,191 @@ def custom_df(dic, scenario, var, resample_freq=None):
 
 matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
 
+## Create dictionarx with variable names, long names, and units
 
-##
-import plotly.express as px
+var_name = ['avg_temp_catchment', 'avg_temp_glaciers',
+                    'evap_off_glaciers', 'prec_off_glaciers', 'prec_on_glaciers', 'rain_off_glaciers', 'snow_off_glaciers',
+                    'rain_on_glaciers', 'snow_on_glaciers', 'snowpack_off_glaciers', 'soil_moisture', 'upper_groundwater',
+                    'lower_groundwater', 'melt_off_glaciers', 'melt_on_glaciers', 'ice_melt_on_glaciers', 'snow_melt_on_glaciers',
+                    'refreezing_ice', 'refreezing_snow', 'total_refreezing', 'SMB', 'actual_evaporation', 'total_precipitation',
+                    'total_melt', 'runoff_without_glaciers', 'runoff_from_glaciers', 'total_runoff', 'glacier_area',
+                    'glacier_elev', 'smb_water_year', 'smb_scaled', 'smb_scaled_capped', 'smb_scaled_capped_cum', 'surplus']
+
+
+title = ['Mean Catchment Temperature',
+         'Mean Temperature of Glacierized Area',
+         'Off-glacier Evaporation',
+         'Off-glacier Precipitation',
+         'On-glacier Precipitation',
+         'Off-glacier Rain',
+         'Off-glacier Snow',
+         'On-glacier Rain',
+         'On-glacier Snow',
+         'Off-glacier Snowpack',
+         'Soil Moisture',
+         'Upper Groundwater',
+         'Lower Groundwater',
+         'Off-glacier Melt',
+         'On-glacier Melt',
+         'On-glacier Ice Melt',
+         'On-glacier Snow Melt',
+         'Refreezing Ice',
+         'Refreezing Snow',
+         'Total Refreezing',
+         'Glacier Surface Mass Balance',
+         'Mean Actual Evaporation',
+         'Mean Total Precipitation',
+         'Total Melt',
+         'Runoff without Glaciers',
+         'Runoff from Glaciers',
+         'Total Runoff',
+         'Glacier Area',
+         'Mean Glacier Elevation',
+         'Surface Mass Balance of the Hydrological Year',
+         'Area-scaled Surface Mass Balance',
+         'Surface Mass Balance Capped at 0',
+         'Cumulative Surface Mass Balance Capped at 0',
+         'Cumulative Surface Mass Balance > 0']
+
+unit = ['°C', '°C', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.',
+        'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.',
+        'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'km²', 'm.a.s.l.', 'mm w.e.', 'mm w.e.',
+        'mm w.e.', 'mm w.e.']
+
+output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
+
+## Plot functions for mean with CIs
+
+import plotly.graph_objects as go
+import numpy as np
+
+
+def confidence_interval(df):
+    """
+    Calculate the mean and 95% confidence interval for each row in a dataframe.
+
+    Args:
+        df (pandas.DataFrame): The input dataframe.
+
+    Returns:
+        pandas.DataFrame: A dataframe with the mean and confidence intervals for each row.
+
+    """
+    mean = df.mean(axis=1)
+    std = df.std(axis=1)
+    count = df.count(axis=1)
+    ci = 1.96 * std / np.sqrt(count)
+    ci_lower = mean - ci
+    ci_upper = mean + ci
+    df_ci = pd.DataFrame({'mean': mean, 'ci_lower': ci_lower, 'ci_upper': ci_upper})
+    return df_ci
+
+
+def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
+    """
+    A function to plot multi-model mean and confidence intervals of a given variable for two different scenarios.
+
+    Parameters:
+    -----------
+    var: str
+        The variable to plot.
+    dic: dict, optional (default=matilda_scenarios)
+        A dictionary containing the scenarios as keys and the dataframes as values.
+    resample_freq: str, optional (default='Y')
+        The resampling frequency to apply to the data.
+    show: bool, optional (default=False)
+        Whether to show the resulting plot or not.
+
+    Returns:
+    --------
+    go.Figure
+        A plotly figure object containing the mean and confidence intervals for the given variable in the two selected scenarios.
+    """
+
+    # SSP2
+    df1 = custom_df(dic, scenario='SSP2', var=var, resample_freq=resample_freq)
+    df1_ci = confidence_interval(df1)
+    # SSP5
+    df2 = custom_df(dic, scenario='SSP5', var=var, resample_freq=resample_freq)
+    df2_ci = confidence_interval(df2)
+
+    fig = go.Figure([
+        # SSP2
+        go.Scatter(
+            name='SSP2',
+            x=df1_ci.index,
+            y=round(df1_ci['mean'], 2),
+            mode='lines',
+            line=dict(color='darkorange'),
+        ),
+        go.Scatter(
+            name='95% CI Upper',
+            x=df1_ci.index,
+            y=round(df1_ci['ci_upper'], 2),
+            mode='lines',
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            showlegend=False
+        ),
+        go.Scatter(
+            name='95% CI Lower',
+            x=df1_ci.index,
+            y=round(df1_ci['ci_lower'], 2),
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            mode='lines',
+            fillcolor='rgba(255, 165, 0, 0.3)',
+            fill='tonexty',
+            showlegend=False
+        ),
+
+        # SSP5
+        go.Scatter(
+            name='SSP5',
+            x=df2_ci.index,
+            y=round(df2_ci['mean'], 2),
+            mode='lines',
+            line=dict(color='darkblue'),
+        ),
+        go.Scatter(
+            name='95% CI Upper',
+            x=df2_ci.index,
+            y=round(df2_ci['ci_upper'], 2),
+            mode='lines',
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            showlegend=False
+        ),
+        go.Scatter(
+            name='95% CI Lower',
+            x=df2_ci.index,
+            y=round(df2_ci['ci_lower'], 2),
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            mode='lines',
+            fillcolor='rgba(0, 0, 255, 0.3)',
+            fill='tonexty',
+            showlegend=False
+        )
+    ])
+    fig.update_layout(
+        xaxis_title='Year',
+        yaxis_title=output_vars[var][0] + ' [' + output_vars[var][1] + ']',
+        title=output_vars[var][0],
+        hovermode='x'
+    )
+    fig.update_yaxes(rangemode='tozero')
+
+    # show figure
+    if show:
+        fig.show()
+
+    return fig
+
+
+
+## Apply the plot functions with a dropdown menu on a Dash server
+
 import dash
 from dash import dcc
 from dash import html
@@ -138,32 +320,28 @@ from dash.dependencies import Input, Output
 import plotly.io as pio
 
 pio.renderers.default = "browser"
-
 app = dash.Dash()
 
 # Create the initial line plot
-df = custom_df(matilda_scenarios, scenario='SSP5', var='glacier_area', resample_freq='10Y')
-fig = px.line(df)
+fig = plot_wit_ci('glacier_area')
 
 # Define the list of arguments for custom_df()
-args = ['glacier_area', 'total_runoff', 'SMB']
+output_vars
+
 
 # Create the callback function
 @app.callback(
     Output('line-plot', 'figure'),
     Input('arg-dropdown', 'value'))
 def update_figure(selected_arg):
-    # Generate the new dataframe based on the selected argument
-    new_df = custom_df(matilda_scenarios, scenario='SSP5', var=selected_arg, resample_freq='10Y')
-    # Update the line plot with the new data for all columns
-    fig = px.line(new_df)
-    return fig
+    return plot_wit_ci(selected_arg)
+
 
 # Define the dropdown menu
 arg_dropdown = dcc.Dropdown(
     id='arg-dropdown',
-    options=[{'label': arg, 'value': arg} for arg in args],
-    value=args[0])
+    options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
+    value='glacier_area')
 
 # Add the dropdown menu to the layout
 app.layout = html.Div([
@@ -171,14 +349,9 @@ app.layout = html.Div([
     dcc.Graph(id='line-plot', figure=fig)])
 
 # Run the app
-app.run_server(debug=True, use_reloader=False)
+app.run_server(debug=True, use_reloader=False)      # Turn off reloader inside jupyter
 
 
-##
-
-# edit axes (custom units)
-# add title (custom variable names)
-# change colors
-# add more vars
 # turn into function/class to customize scenario/resample_rate/renderer etc.
 # test in binder and add dash to requirements
+
