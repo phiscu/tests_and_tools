@@ -324,8 +324,7 @@ def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
     return fig
 
 
-## Apply the plot functions with a dropdown menu on a Dash server
-
+##
 import dash
 from dash import dcc
 from dash import html
@@ -336,32 +335,47 @@ pio.renderers.default = "browser"
 app = dash.Dash()
 
 # Create the initial line plot
-fig = plot_wit_ci('total_runoff')
-
+fig = plot_wit_ci('total_runoff', resample_freq='D')
 
 # Create the callback function
 @app.callback(
     Output('line-plot', 'figure'),
-    Input('arg-dropdown', 'value'))
-def update_figure(selected_arg):
-    return plot_wit_ci(selected_arg)
+    Input('arg-dropdown', 'value'),
+    Input('freq-dropdown', 'value'))
+def update_figure(selected_arg, selected_freq):
+    return plot_wit_ci(selected_arg, resample_freq=selected_freq)
 
-
-# Define the dropdown menu
+# Define the dropdown menu for variable
 arg_dropdown = dcc.Dropdown(
     id='arg-dropdown',
     options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
     value='total_runoff',
-    clearable=False)
+    clearable=False,
+    style={'width': '250px'})
 
-# Add the dropdown menu to the layout
+# Define the dropdown menu for resampling frequency
+freq_dropdown = dcc.Dropdown(
+    id='freq-dropdown',
+    options=[{'label': freq, 'value': freq} for freq in ['M', 'Y', '10Y']],
+    value='Y',
+    clearable=False,
+    style={'width': '100px'})
+
+# Add the dropdown menus to the layout and use CSS to place them next to each other
 app.layout = html.Div([
-    arg_dropdown,
-    dcc.Graph(id='line-plot', figure=fig)])
+    html.Div([
+        html.Label("Variable:"),
+        arg_dropdown,
+    ], style={'display': 'inline-block', 'margin-right': '30px'}),
+    html.Div([
+        html.Label("Resampling Frequency:"),
+        freq_dropdown,
+    ], style={'display': 'inline-block'}),
+    dcc.Graph(id='line-plot', figure=fig)
+])
 
 # Run the app
-app.run_server(debug=True, use_reloader=False)      # Turn off reloader inside jupyter
-
+app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside jupyter
 
 # turn into function/class to customize scenario/resample_rate/renderer etc.
 # test in binder and add dash to requirements
