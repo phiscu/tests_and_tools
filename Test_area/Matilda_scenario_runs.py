@@ -303,34 +303,115 @@ class MatildaBulkProcessor:
 
 matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
 
+
+## Store results in parquet files to limit storage costs
+
+import pandas as pd
+import os
+from fastparquet import write
+from tqdm import tqdm
+
+
+def dict_to_parquet(dictionary: dict, directory_path: str, pbar: bool = True) -> None:
+    """
+    Recursively stores the dataframes in the input dictionary as parquet files in the specified directory.
+    Nested dictionaries are supported. If the specified directory does not exist, it will be created.
+    Parameters
+    ----------
+    dictionary : dict
+        A nested dictionary containing pandas dataframes.
+    directory_path : str
+        The directory path to store the parquet files.
+    pbar : bool, optional
+        A flag indicating whether to display a progress bar. Default is True.
+    """
+    if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
+    if pbar:
+        bar_iter = tqdm(dictionary.items(), desc='Writing parquet files: ')
+    else:
+        bar_iter = dictionary.items()
+    for k, v in bar_iter:
+        if isinstance(v, dict):
+            dict_to_parquet(v, os.path.join(directory_path, k), pbar=False)
+        else:
+            file_path = os.path.join(directory_path, k + ".parquet")
+            write(file_path, v, compression='GZIP')
+
+
+def parquet_to_dict(directory_path: str, pbar: bool = True) -> dict:
+    """
+    Recursively loads the dataframes from the parquet files in the specified directory and returns a dictionary.
+    Nested directories are supported.
+    Parameters
+    ----------
+    directory_path : str
+        The directory path containing the parquet files.
+    pbar : bool, optional
+        A flag indicating whether to display a progress bar. Default is True.
+    Returns
+    -------
+    dict
+        A dictionary containing the loaded pandas dataframes.
+    """
+    dictionary = {}
+    if pbar:
+        bar_iter = tqdm(sorted(os.listdir(directory_path)), desc='Reading parquet files: ')
+    else:
+        bar_iter = sorted(os.listdir(directory_path))
+    for file_name in bar_iter:
+        file_path = os.path.join(directory_path, file_name)
+        if os.path.isdir(file_path):
+            dictionary[file_name] = parquet_to_dict(file_path, pbar=False)
+        elif file_name.endswith(".parquet"):
+            k = file_name[:-len(".parquet")]
+            dictionary[k] = pd.read_parquet(file_path)
+    return dictionary
+
+
+# Store dictionary in Parquet files
+# dict_to_parquet(matilda_scenarios, test_dir + 'adjusted/parquet')
+# Load dictionary from Parquet files
+matilda_scenarios = parquet_to_dict(test_dir + 'adjusted/parquet')
+
+
 ## Create custom dataframes for analysis
 
 def custom_df(dic, scenario, var, resample_freq=None):
     """
     Takes a dictionary of model outputs and returns a combined dataframe of a specific variable for a given scenario.
-    Parameters:
-        dic (dict): A nested dictionary of model outputs.
-                    The outer keys are scenario names and the inner keys are model names.
-                    The corresponding values are dictionaries containing two keys:
-                        'model_output' (DataFrame): containing model outputs for a given scenario and model
-                        'glacier_rescaling' (DataFrame): containing glacier properties for a given scenario and model
-        scenario (str): The name of the scenario to select from the dictionary.
-        var (str): The name of the variable to extract from the model output DataFrame.
-        resample_freq (str, optional): The frequency of the resulting time series data.
-                                       Defaults to None (i.e. no resampling).
-                                       If provided, should be in pandas resample frequency string format.
-    Returns:
-        pandas.DataFrame: A DataFrame containing the combined data of the specified variable for the selected scenario
-                          and models. The DataFrame is indexed by the time steps of the original models.
-                          The columns are the names of the models in the selected scenario.
-    Raises:
-        ValueError: If the provided  var  string is not one of the following: ['avg_temp_catchment', 'avg_temp_glaciers',
-                    'evap_off_glaciers', 'prec_off_glaciers', 'prec_on_glaciers', 'rain_off_glaciers', 'snow_off_glaciers',
-                    'rain_on_glaciers', 'snow_on_glaciers', 'snowpack_off_glaciers', 'soil_moisture', 'upper_groundwater',
-                    'lower_groundwater', 'melt_off_glaciers', 'melt_on_glaciers', 'ice_melt_on_glaciers', 'snow_melt_on_glaciers',
-                    'refreezing_ice', 'refreezing_snow', 'total_refreezing', 'SMB', 'actual_evaporation', 'total_precipitation',
-                    'total_melt', 'runoff_without_glaciers', 'runoff_from_glaciers', 'total_runoff', 'glacier_area',
-                    'glacier_elev', 'smb_water_year', 'smb_scaled', 'smb_scaled_capped', 'smb_scaled_capped_cum', 'surplus']
+    Parameters
+    -------
+    dic : dict
+        A nested dictionary of model outputs.
+        The outer keys are scenario names and the inner keys are model names.
+        The corresponding values are dictionaries containing two keys:
+        'model_output' (DataFrame): containing model outputs for a given scenario and model
+        'glacier_rescaling' (DataFrame): containing glacier properties for a given scenario and model
+    scenario : str
+        The name of the scenario to select from the dictionary.
+    var : str
+        The name of the variable to extract from the model output DataFrame.
+    resample_freq : str, optional
+        The frequency of the resulting time series data.
+        Defaults to None (i.e. no resampling).
+        If provided, should be in pandas resample frequency string format.
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing the combined data of the specified variable for the selected scenario
+        and models. The DataFrame is indexed by the time steps of the original models.
+        The columns are the names of the models in the selected scenario.
+    Raises
+    -------
+    ValueError
+        If the provided  var  string is not one of the following: ['avg_temp_catchment', 'avg_temp_glaciers',
+        'evap_off_glaciers', 'prec_off_glaciers', 'prec_on_glaciers', 'rain_off_glaciers', 'snow_off_glaciers',
+        'rain_on_glaciers', 'snow_on_glaciers', 'snowpack_off_glaciers', 'soil_moisture', 'upper_groundwater',
+        'lower_groundwater', 'melt_off_glaciers', 'melt_on_glaciers', 'ice_melt_on_glaciers', 'snow_melt_on_glaciers',
+        'refreezing_ice', 'refreezing_snow', 'total_refreezing', 'SMB', 'actual_evaporation', 'total_precipitation',
+        'total_melt', 'runoff_without_glaciers', 'runoff_from_glaciers', 'total_runoff', 'glacier_area',
+        'glacier_elev', 'smb_water_year', 'smb_scaled', 'smb_scaled_capped', 'smb_scaled_capped_cum', 'surplus']
     """
     out1_cols = ['avg_temp_catchment', 'avg_temp_glaciers', 'evap_off_glaciers',
                  'prec_off_glaciers', 'prec_on_glaciers', 'rain_off_glaciers',
@@ -385,16 +466,6 @@ def custom_df(dic, scenario, var, resample_freq=None):
 # custom_df(matilda_scenarios, scenario='SSP5', var='smb_water_year', resample_freq='Y')
 
 
-## Plot example
-import matplotlib.pyplot as plt
-
-# combined_df = custom_df(matilda_scenarios, scenario='SSP5', var='runoff_from_glaciers', resample_freq='10Y')
-# # Create the line plot
-# combined_df.plot()
-# plt.xlabel('x-axis label')
-# plt.ylabel('y-axis label')
-# plt.title('Title of the plot')
-# plt.show()
 
 
 

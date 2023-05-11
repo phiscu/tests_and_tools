@@ -1,34 +1,14 @@
 import pickle
 import os
 import pandas as pd
+from fastparquet import write
+from tqdm import tqdm
 import sys
 from pathlib import Path
 from matilda.core import matilda_simulation
 
 
 test_dir = '/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/cmip6/'
-
-
-def dict_to_pickle(dic, target_path):
-    """
-    Saves a dictionary to a pickle file at the specified target path.
-    Creates target directory if not existing.
-    Parameters
-    ----------
-    dic : dict
-        The dictionary to save to a pickle file.
-    target_path : str
-        The path of the file where the dictionary shall be stored.
-    Returns
-    -------
-    None
-    """
-    target_dir = os.path.dirname(target_path)
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-
-    with open(target_path, 'wb') as f:
-        pickle.dump(dic, f)
 
 
 def pickle_to_dict(file_path):
@@ -46,6 +26,36 @@ def pickle_to_dict(file_path):
     with open(file_path, 'rb') as f:
         dic = pickle.load(f)
     return dic
+
+
+def parquet_to_dict(directory_path: str, pbar: bool = True) -> dict:
+    """
+    Recursively loads the dataframes from the parquet files in the specified directory and returns a dictionary.
+    Nested directories are supported.
+    Parameters
+    ----------
+    directory_path : str
+        The directory path containing the parquet files.
+    pbar : bool, optional
+        A flag indicating whether to display a progress bar. Default is True.
+    Returns
+    -------
+    dict
+        A dictionary containing the loaded pandas dataframes.
+    """
+    dictionary = {}
+    if pbar:
+        bar_iter = tqdm(sorted(os.listdir(directory_path)), desc='Reading parquet files: ')
+    else:
+        bar_iter = sorted(os.listdir(directory_path))
+    for file_name in bar_iter:
+        file_path = os.path.join(directory_path, file_name)
+        if os.path.isdir(file_path):
+            dictionary[file_name] = parquet_to_dict(file_path, pbar=False)
+        elif file_name.endswith(".parquet"):
+            k = file_name[:-len(".parquet")]
+            dictionary[k] = pd.read_parquet(file_path)
+    return dictionary
 
 
 def custom_df(dic, scenario, var, resample_freq=None):
@@ -95,7 +105,7 @@ def custom_df(dic, scenario, var, resample_freq=None):
         output_df = 'glacier_rescaling'
     else:
         raise ValueError("var needs to be one of the following strings: " +
-                         str([out1_cols, out2_cols]))
+                         str([i for i in [out1_cols, out2_cols]]))
 
     # Create an empty list to store the dataframes
     dfs = []
@@ -124,11 +134,11 @@ def custom_df(dic, scenario, var, resample_freq=None):
 
     return combined_df
 
+# matilda_scenarios = parquet_to_dict(test_dir + 'adjusted/parquet')
+matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')   # pickle for speed/parquet for size
 
 
-matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
-
-## Create dictionarx with variable names, long names, and units
+## Create dictionary with variable names, long names, and units
 
 var_name = ['avg_temp_catchment', 'avg_temp_glaciers',
                     'evap_off_glaciers', 'prec_off_glaciers', 'prec_on_glaciers', 'rain_off_glaciers', 'snow_off_glaciers',
@@ -137,7 +147,6 @@ var_name = ['avg_temp_catchment', 'avg_temp_glaciers',
                     'refreezing_ice', 'refreezing_snow', 'total_refreezing', 'SMB', 'actual_evaporation', 'total_precipitation',
                     'total_melt', 'runoff_without_glaciers', 'runoff_from_glaciers', 'total_runoff', 'glacier_area',
                     'glacier_elev', 'smb_water_year', 'smb_scaled', 'smb_scaled_capped', 'smb_scaled_capped_cum', 'surplus']
-
 
 title = ['Mean Catchment Temperature',
          'Mean Temperature of Glacierized Area',
@@ -190,13 +199,12 @@ import numpy as np
 def confidence_interval(df):
     """
     Calculate the mean and 95% confidence interval for each row in a dataframe.
-
-    Args:
+    Parameters:
+    -----------
         df (pandas.DataFrame): The input dataframe.
-
     Returns:
+    --------
         pandas.DataFrame: A dataframe with the mean and confidence intervals for each row.
-
     """
     mean = df.mean(axis=1)
     std = df.std(axis=1)
@@ -211,7 +219,6 @@ def confidence_interval(df):
 def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
     """
     A function to plot multi-model mean and confidence intervals of a given variable for two different scenarios.
-
     Parameters:
     -----------
     var: str
@@ -222,12 +229,14 @@ def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
         The resampling frequency to apply to the data.
     show: bool, optional (default=False)
         Whether to show the resulting plot or not.
-
     Returns:
     --------
     go.Figure
         A plotly figure object containing the mean and confidence intervals for the given variable in the two selected scenarios.
     """
+
+    if var is None:
+        var = 'total_runoff'       # Default if nothing selected
 
     # SSP2
     df1 = custom_df(dic, scenario='SSP2', var=var, resample_freq=resample_freq)
@@ -298,8 +307,13 @@ def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
     fig.update_layout(
         xaxis_title='Year',
         yaxis_title=output_vars[var][0] + ' [' + output_vars[var][1] + ']',
-        title=output_vars[var][0],
-        hovermode='x'
+        title={'text': '<b>' + output_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
+        legend={'font': {'size': 18, 'family': 'Arial'}},
+        hovermode='x',
+        plot_bgcolor='rgba(255, 255, 255, 1)',  # Set the background color to white
+        margin=dict(l=10, r=10, t=90, b=10),  # Adjust the margins to remove space around the plot
+        xaxis=dict(gridcolor='lightgrey'),  # set the grid color of x-axis to lightgrey
+        yaxis=dict(gridcolor='lightgrey'),  # set the grid color of y-axis to lightgrey
     )
     fig.update_yaxes(rangemode='tozero')
 
@@ -308,7 +322,6 @@ def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
         fig.show()
 
     return fig
-
 
 
 ## Apply the plot functions with a dropdown menu on a Dash server
@@ -323,10 +336,7 @@ pio.renderers.default = "browser"
 app = dash.Dash()
 
 # Create the initial line plot
-fig = plot_wit_ci('glacier_area')
-
-# Define the list of arguments for custom_df()
-output_vars
+fig = plot_wit_ci('total_runoff')
 
 
 # Create the callback function
@@ -341,7 +351,8 @@ def update_figure(selected_arg):
 arg_dropdown = dcc.Dropdown(
     id='arg-dropdown',
     options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
-    value='glacier_area')
+    value='total_runoff',
+    clearable=False)
 
 # Add the dropdown menu to the layout
 app.layout = html.Div([
@@ -354,4 +365,5 @@ app.run_server(debug=True, use_reloader=False)      # Turn off reloader inside j
 
 # turn into function/class to customize scenario/resample_rate/renderer etc.
 # test in binder and add dash to requirements
+# add fastparquet to requirements
 
