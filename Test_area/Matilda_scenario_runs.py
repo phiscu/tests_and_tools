@@ -94,28 +94,52 @@ matilda_settings = {
     "ele_glac": 4068,  # Elevation of the glacier
     "pfilter": 0  # Filter parameter
 }
+# param_dict = {
+#     'lr_temp': -0.006077369,  # Lapse rate for temperature
+#     'lr_prec': 0.0013269137,  # Lapse rate for precipitation
+#     'BETA': 5.654754,
+#     'CET': 0.08080378,
+#     'FC': 365.68375,  # Field capacity
+#     'K0': 0.36890236,  # K0 parameter
+#     'K1': 0.022955153,  # K1 parameter
+#     'K2': 0.060069658,  # K2 parameter
+#     'LP': 0.63395154,  # LP parameter
+#     'MAXBAS': 5.094901,  # Maximum basin storage
+#     'PERC': 0.39491335,  # Percolation
+#     'UZL': 348.0978,  # Upper zone limit
+#     'PCORR': 1.0702422,  # Precipitation correction
+#     'TT_snow': -1.1521467,  # Temperature threshold for snow
+#     'TT_diff': 1.5895765,  # Temperature difference
+#     'CFMAX_ice': 3.6518102,  # Maximum ice content
+#     'CFMAX_rel': 1.8089349,  # Maximum relative content
+#     'SFCF': 0.42293832,  # Soil field capacity
+#     'CWH': 0.11234668,  # Crop water holding capacity
+#     'AG': 0.9618855,
+#     'RFS': 0.11432563  # Rainfall sensitivity ???
+# }
+
 param_dict = {
-    'lr_temp': -0.006077369,  # Lapse rate for temperature
-    'lr_prec': 0.0013269137,  # Lapse rate for precipitation
-    'BETA': 5.654754,
-    'CET': 0.08080378,
-    'FC': 365.68375,  # Field capacity
-    'K0': 0.36890236,  # K0 parameter
-    'K1': 0.022955153,  # K1 parameter
-    'K2': 0.060069658,  # K2 parameter
-    'LP': 0.63395154,  # LP parameter
-    'MAXBAS': 5.094901,  # Maximum basin storage
-    'PERC': 0.39491335,  # Percolation
-    'UZL': 348.0978,  # Upper zone limit
-    'PCORR': 1.0702422,  # Precipitation correction
-    'TT_snow': -1.1521467,  # Temperature threshold for snow
-    'TT_diff': 1.5895765,  # Temperature difference
-    'CFMAX_ice': 3.6518102,  # Maximum ice content
-    'CFMAX_rel': 1.8089349,  # Maximum relative content
-    'SFCF': 0.42293832,  # Soil field capacity
-    'CWH': 0.11234668,  # Crop water holding capacity
-    'AG': 0.9618855,
-    'RFS': 0.11432563  # Rainfall sensitivity ???
+         'lr_temp': -0.006472598,
+         'lr_prec': 0.00010296448,
+         'BETA': 4.625306,
+         'CET': 0.2875196,
+         'FC': 364.81818,
+         'K0': 0.28723368,
+         'K1': 0.015692418,
+         'K2': 0.004580627,
+         'LP': 0.587188,
+         'MAXBAS': 6.730105,
+         'PERC': 1.1140852,
+         'UZL': 198.82584,
+         'PCORR': 0.74768984,
+         'TT_snow': -1.3534238,
+         'TT_diff': 0.70977557,
+         'CFMAX_ice': 2.782649,
+         'CFMAX_rel': 1.2481626,
+         'SFCF': 0.879982,
+         'CWH': 0.0020890352,
+         'AG': 0.8640329,
+         'RFS': 0.21825151
 }
 
 ## Read adjusted CMIP6 data

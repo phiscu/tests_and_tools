@@ -42,7 +42,7 @@ print(df2.columns)
     # start, end, and length of melting season:
         # melt variables depend on availability of snow/ice AND temperature!
         # Temperature might be better --> three consecutive days above 0°C
-    # start, end, and length of wet/dry season:
+    # length an frequency of dry periods
         # precipitation >/< potential evap
 
 # Time series to integrate in MATILDA
@@ -207,39 +207,69 @@ def runoff_ratio(df):
 
 
 
-## Long-term annual cycle of evaporation and precipitation
+## Long-term annual cycle of evaporation and precipitation for every decade
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+# Compute the rolling mean of evaporation and precipitation
+df_avg = df[['prec_off_glaciers', 'evap_off_glaciers']].rolling(window=30).mean()
 
-df_avg = df[['evap_off_glaciers', 'prec_off_glaciers']]
+# Split the data into decades
+decades = range(df.index.year.min(), df.index.year.max() + 1, 10)
 
-df_avg = df[['evap_off_glaciers', 'prec_off_glaciers']].groupby([df.index.month, df.index.day]).mean()
-df_avg["date"] = pd.date_range(df.index[0], freq='D', periods=len(df_avg)).strftime(
-            '%Y-%m-%d')
-df_avg.index = pd.to_datetime(df_avg["date"])
+# Iterate over each decade to get global maximum
+decade_max = []
+for i, decade in enumerate(decades):
+    # Filter the data for the current decade
+    decade_data = df_avg.loc[(df_avg.index.year >= decade) & (df_avg.index.year < decade + 10)]
+    # Compute the mean value for each day of the year for the current decade
+    decade_data = decade_data.groupby([decade_data.index.month, decade_data.index.day]).mean()
+    # Get maximum value
+    decade_max.append(decade_data.max().max())
 
-# plot the data
-fig, ax = plt.subplots()
-df_avg.plot(ax=ax)
+global_max = max(decade_max)
 
-# set the tick formatter of the x-axis to only show the month name
-ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+# Create a new figure with a 4x3 subplot grid
+fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(12, 12))
 
-# make sure every month is labeled
-ax.xaxis.set_tick_params(rotation=0, which='major')
+# Iterate over each decade and create a plot for each
+for i, decade in enumerate(decades):
+    # Compute the row and column indices of the current subplot
+    row = i // 3
+    col = i % 3
+    # Filter the data for the current decade
+    decade_data = df_avg.loc[(df_avg.index.year >= decade) & (df_avg.index.year < decade + 10)]
+    # Compute the mean value for each day of the year for the current decade
+    decade_data = decade_data.groupby([decade_data.index.month, decade_data.index.day]).mean()
+    # Create a new subplot for the current decade
+    ax = axs[row, col]
+    # Plot the data for the current decade
+    decade_data.plot(ax=ax, legend=False)
+    # Set the tick formatter of the x-axis to only show the month name
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+    # Make sure every month is labeled
+    ax.xaxis.set_tick_params(rotation=0, which='major')
 
-# set the plot title and labels
-ax.set(title='10-year average annual cycle of Evaporation and Precipitation',
-       xlabel=None, ylabel='mm')
+    # Set the y-axis limit to the maximum range of the whole dataset
+    ax.set_ylim(-0.3, global_max*1.1)
 
-# show the plot
+    # Set the plot title and labels
+    ax.set(title=f'{decade}-{decade+9}',
+           xlabel=None, ylabel='mm')
+
+# Create a common legend for all subplots at the bottom of the figure
+handles, labels = ax.get_legend_handles_labels()
+fig.legend(handles, labels, loc='lower center', ncol=2)
+# Add title
+fig.suptitle('Average annual cycle of Evaporation and Precipitation', fontsize=16)
+# Make sure the subplots don't overlap
+plt.tight_layout()
+# Add some space at the bottom of the figure for the legend
+fig.subplots_adjust(bottom=0.06, top=0.92)
+# Show the plot
 plt.show()
-
-
-
-
 
 
 ## Hydrological signatures
@@ -261,65 +291,43 @@ sig.get_qhv(test)               # high flow variability
 sig.get_qlv(test)               # low flow variability
 sig.get_sfdc(test)              # slope in the middle part of the flow duration curve
 
-##  PROBLEM: EVAPORATION IS MUCH LOWER FOR MOST YEARS. NO DISTINCT DRY PERIOD. PARAMETER PROBLEM?
-def dry_season(df):
+
+##
+def dry_periods(df, period_length=30):
     """
-    Compute the start, end, and length of the dry season for each calendar year based on the daily mean "total_precipitation" and "evapotranspiration" data provided in the input dataframe.
-    The start of the dry season is defined as the first day of the first two-week period where the average "evapotranspiration" is larger than the average "total_precipitation".
-    The end of the dry season is the first day of the first two-week period where the average "evapotranspiration" is smaller than the average "total_precipitation".
-    The length of the dry season is the number of days between the start and end of the dry season.
+    Compute the number of days for which the rolling mean of evaporation exceeds precipitation for each year in the
+    input DataFrame.
     Parameters
     ----------
     df : pandas.DataFrame
-        A DataFrame of daily mean "prec_off_glaciers" and "evap_off_glaciers" data with a datetime index.
+        Input DataFrame containing columns 'evap_off_glaciers' and 'prec_off_glaciers' with daily evaporation and
+        precipitation data, respectively.
+    period_length : int, optional
+        Length of the rolling window in days. Default is 30.
     Returns
     -------
     pandas.DataFrame
-        A DataFrame with the start, end, and length of the dry season for each calendar year, with a DatetimeIndex.
+        DataFrame containing the number of days for which the rolling mean of evaporation exceeds precipitation for each
+        year in the input DataFrame.
     """
 
-    # Find the start of the dry season for each year
-    start_dates = []
+    # Find number of days when the rolling mean of evaporation exceeds precipitation
+    periods = []
     for year in df.index.year.unique():
         year_data = df.loc[df.index.year == year]
-        year_roll = year_data['evap_off_glaciers'].rolling(window=30).mean()
-        prec_roll = year_data['prec_off_glaciers'].rolling(window=30).mean()
-        if (year_roll > prec_roll).any():
-            start_index = year_roll[year_roll > prec_roll].index[0]
-            start_index = start_index - pd.Timedelta(days=29)
-            start_dates.append(start_index)
-        else:
-            start_dates.append(pd.NaT)
+        evap_roll = year_data['evap_off_glaciers'].rolling(window=period_length).mean()
+        prec_roll = year_data['prec_off_glaciers'].rolling(window=period_length).mean()
 
-            # Find the end of the dry season for each year
-    end_dates = []
-    for year in df.index.year.unique():
-        year_data = df.loc[df.index.year == year]
-        year_roll = year_data['evap_off_glaciers'].rolling(window=30).mean()
-        prec_roll = year_data['prec_off_glaciers'].rolling(window=30).mean()
-        start_index = start_dates[year - df.index.year.min()]
-        if not start_index:
-            end_dates.append(pd.NaT)
-        else:
-            year_roll = year_roll.loc[start_index + pd.Timedelta(weeks=6):]
-            prec_roll = prec_roll.loc[start_index + pd.Timedelta(weeks=6):]
-            if (year_roll < prec_roll).any():
-                end_index = year_roll[year_roll < prec_roll].index[0]
-                end_index = end_index - pd.Timedelta(days=29)
-                end_dates.append(end_index)
-            else:
-                end_dates.append(pd.NaT)
-
-                # Compute the length of the dry season for each year
-    lengths = [pd.NaT if not start_dates[i] or not end_dates[i] else (end_dates[i] - start_dates[i]).days for i in
-               range(len(start_dates))]
+        dry = evap_roll[evap_roll - prec_roll > 0]
+        periods.append(len(dry))
 
     # Assemble the output dataframe
     output_df = pd.DataFrame(
-        {'dry_season_start': [d.timetuple().tm_yday if not pd.isnull(d) else pd.NaT for d in start_dates],
-         'dry_season_end': [d.timetuple().tm_yday if not pd.isnull(d) else pd.NaT for d in end_dates],
-         'dry_season_length': lengths},
+        {'dry_period_days': periods},
         index=pd.to_datetime(df.index.year.unique(), format='%Y'))
+
     return output_df
 
-dry = dry_season(df)
+
+dry_periods(df).plot()
+plt.show()
