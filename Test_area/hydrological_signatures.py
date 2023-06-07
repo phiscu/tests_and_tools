@@ -1,4 +1,5 @@
 import pickle
+import numpy as np
 import os
 import pandas as pd
 from fastparquet import write
@@ -26,9 +27,12 @@ def pickle_to_dict(file_path):
 matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')   # pickle for speed/parquet for size
 
 df = matilda_scenarios['SSP2']['EC-Earth3']['model_output']
+df2 = matilda_scenarios['SSP2']['EC-Earth3']['glacier_rescaling']
 test = df['total_runoff']
 
 print(df.columns)
+print(df2.columns)
+
 
 ## What to analyze?
 
@@ -179,6 +183,26 @@ def melting_season(df):
                               'melt_season_length': lengths},
                              index=pd.to_datetime(df.index.year.unique(), format='%Y'))
     return output_df
+
+
+# Total runoff ratio
+
+def runoff_ratio(df):
+    """
+    Calculates the proportion of precipitation that does not infiltrate and or evapotranspirate.
+     Parameters:
+    -----------
+        df: pandas.DataFrame
+            DataFrame containing the variables 'total_runoff' and 'total_precipitation'.
+     Returns:
+    --------
+        pandas.DataFrame
+            DataFrame containing the runoff ratio for each observation in the input DataFrame,
+            with the same datetime index as the input DataFrame.
+            If 'total_precipitation' is 0, the corresponding runoff ratio is set to 0.
+    """
+    runoff_ratio = np.where(df['total_precipitation'] == 0, 0, df['total_runoff'] / df['total_precipitation'])
+    return pd.DataFrame(data=runoff_ratio, index=df.index, columns=['runoff_ratio'])
 
 
 

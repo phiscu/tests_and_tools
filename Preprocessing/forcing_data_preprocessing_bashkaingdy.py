@@ -18,10 +18,10 @@ elif 'cirrus' in host:
 else:
     home = str(Path.home()) + '/Seafile'
 wd = home + '/Ana-Lena_Phillip/data/matilda/Preprocessing'
-os.chdir(wd + '/Downscaling')
+# os.chdir(wd + '/Downscaling')
 sys.path.append(wd)
-import Downscaling.scikit_downscale_matilda as sds
-from Preprocessing_functions import pce_correct
+# import Downscaling.scikit_downscale_matilda as sds
+# from Preprocessing_functions import pce_correct
 
 
 

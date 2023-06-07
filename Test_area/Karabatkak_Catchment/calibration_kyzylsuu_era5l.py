@@ -59,6 +59,7 @@ df_era.columns = ['TIMESTAMP', 'T2', 'RRR']
 df_har = pd.concat([t2m_agg.time, t2m_agg.har, tp_agg.har], axis=1)
 df_har.columns = ['TIMESTAMP', 'T2', 'RRR']
 
+
 ## Calibration data:
 # 18y MBs (Shean et.al.)
 mb_catch = -0.16
@@ -149,8 +150,24 @@ param_dict = {'lr_temp': -0.00565, 'lr_prec': 0.00187, 'BETA': 2.022733, 'CET': 
               'PERC': 2.9873798, 'UZL': 160.45435, 'PCORR': 0.61, 'TT_snow': -0.866, 'TT_diff': 0.51, 'CFMAX_ice': 4.34,
               'CFMAX_rel': 1.2, 'SFCF': 0.99, 'CWH': 0.021318546, 'AG': 0.60934013, 'RFS': 0.0503}
 
+
+##
+
+df_era_neu = pd.read_csv('/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/for_spot/ERA5L.csv', usecols=['temp', 'prec', 'dt'])
+df_era_neu.columns = ['T2', 'RRR', 'TIMESTAMP']
+
+df_era_neu = df_era_neu.reindex(columns=['TIMESTAMP', 'T2', 'RRR'])
+
+df_era_neu['TIMESTAMP'] = pd.to_datetime(df_era_neu['TIMESTAMP'])
+
+# remove HH:MM:SS part of 'TIMESTAMP' column
+df_era_neu['TIMESTAMP'] = df_era_neu['TIMESTAMP'].dt.date
+
+df_era.describe()
+df_era_neu.describe()
+
 ## Check results:
-output_MATILDA = matilda_simulation(df_era, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
+output_MATILDA = matilda_simulation(df_era_neu, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2000-01-01', sim_end='2017-12-31', freq="M", glacier_profile=glacier_profile,
                                     area_cat=295.763, lat=42.33, warn=False, plot_type="all", plots=True, elev_rescaling=True,
                                     ele_dat=3341, ele_cat=3295, area_glac=32.51, ele_glac=4068, pfilter=0,

@@ -196,6 +196,13 @@ param_dict = {'lr_temp': -0.0057281437, 'lr_prec': 0.0008959501, 'BETA': 3.23770
 
 
 
+##
+param_dict = {'lr_temp': -0.0060680034, 'lr_prec': 0.0015839578, 'BETA': 1.019925, 'CET': 0.2985032, 'FC': 435.7932, 'K0': 0.3087257, 'K1': 0.017358184, 'K2': 0.1424457, 'LP': 0.6896519, 'MAXBAS': 3.3328557, 'PERC': 0.3830035, 'UZL': 451.22226, 'PCORR': 1.0333605, 'TT_snow': 0.120240286, 'TT_diff': 0.73833454, 'CFMAX_ice': 6.0984306, 'CFMAX_rel': 2.284031, 'SFCF': 0.4343347, 'CWH': 0.17667627, 'AG': 0.42384988, 'RFS': 0.07003174}
+
+
+
+
+
 ## Check results:
 output_MATILDA = matilda_simulation(df_har, obs=obs, set_up_start='1997-01-01', set_up_end='1999-12-31', # output='/home/phillip/Seafile/Ana-Lena_Phillip/data/test',
                                     sim_start='2000-01-01', sim_end='2017-12-31', freq="M", glacier_profile=glacier_profile,

@@ -1,23 +1,23 @@
 #!/bin/bash
-#longitude_range=75.80,76.40
-#latitude_range=41.00,41.40
-longitude_range=77.90,78.50
-latitude_range=41.90,42.50
+longitude_range=75.80,76.40
+latitude_range=41.00,41.40
+#longitude_range=77.90,78.50
+#latitude_range=41.90,42.50
 
 ncdf_folder=/data/projects/ensembles/era5_land/ERA5-Land_HMA/nc/
-dataset_name=ERA5L_1982_2021.nc
+dataset_name=ERA5L_1982_2022.nc
 underscore=_
 
 #destination_folder=/data/projects/ebaca/Ana-Lena_Phillip/data/input_output/input/ERA5/Tien-Shan/At-Bashy/new_grib_conversion
 #destination_name=no182
-destination_folder=/data/projects/ebaca/Ana-Lena_Phillip/data/input_output/input/ERA5/Tien-Shan/Kysylsuu
-destination_name=kyzylsuu_full_catchment
+destination_folder=/data/projects/ebaca/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/bashkaingdy/met/era5l
+destination_name=bashkaindy_full_catchment
 
 
 # "d2m" "sf" "sp" "ssrd" "strd" "t2m" "tp" "u10" "v10" "pev"
 
 mkdir $destination_folder/variables
-for field in "pev" ; do
+for field in "tp" ; do
     echo $field
     output_folder=$destination_folder/variables/$field
     mkdir $output_folder
@@ -34,7 +34,7 @@ for field in "pev" ; do
     done
 done
 
-for field in "pev" ; do
+for field in "tp" ; do
     input_folder=$destination_folder/variables/$field
     cd $input_folder
     output_timemerge=$destination_folder/variables/$field$underscore$dataset_name

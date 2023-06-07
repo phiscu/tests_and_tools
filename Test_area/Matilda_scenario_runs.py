@@ -462,8 +462,7 @@ def custom_df(dic, scenario, var, resample_freq=None):
 
     return combined_df
 
-
-# custom_df(matilda_scenarios, scenario='SSP5', var='smb_water_year', resample_freq='Y')
+custom_df(matilda_scenarios, scenario='SSP5', var='smb_water_year', resample_freq='Y')
 
 
 
