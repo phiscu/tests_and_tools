@@ -1,5 +1,10 @@
 import pickle
 import numpy as np
+import spei
+import spotpy.hydrology.signatures as sig
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import os
 import pandas as pd
 from fastparquet import write
@@ -49,45 +54,45 @@ print(df2.columns)
     # frozen water storage
     # total runoff ratio (runoff/precipitation)
     # Standardized Precipitation Evapotranspiration Index (SPEI)
-    # Percentage of Normal Precipitation (PNP)
-
 ## Functions
 
-# Month with maximum precipitation
+# DIE MEISTEN FUNKTIONEN AUF HYDROLOGISCHE JAHRE UMSTELLEN!!
 
-def prec_minmax(df, max=True):
+# create hydrological years starting from October 1
+hy_start_dates = pd.date_range(start=daily_data.index[0], end=daily_data.index[-1], freq='AS-OCT')
+hy_end_dates = hy_start_dates + pd.DateOffset(months=9, days=30)
+hydro_years = [(start, end) for start, end in zip(hy_start_dates, hy_end_dates)]
+
+
+# Month with maximum precipitation
+def prec_minmax(df):
     """
-    Compute the month(s) of extreme precipitation for each year.
+    Compute the months of extreme precipitation for each year.
     Parameters
     ----------
     df : pandas.DataFrame
         A DataFrame of daily precipitation data with a datetime index and a 'total_precipitation' column.
-    max : bool, optional
-        If True, return the month(s) of maximum precipitation. Otherwise, return the month(s) of minimum precipitation.
-        Default is True.
     Returns
     -------
     pandas.DataFrame
-        A DataFrame with the month(s) of extreme precipitation as a number for every calendar year.
+        A DataFrame with the months of extreme precipitation as a number for every calendar year.
     """
     # group the data by year and month and sum the precipitation values
     grouped = df.groupby([df.index.year, df.index.month]).sum()
     # get the month with extreme precipitation for each year
-    if max:
-        extreme_month = grouped.groupby(level=0)['total_precipitation'].idxmax()
-    else:
-        extreme_month = grouped.groupby(level=0)['total_precipitation'].idxmin()
-    extreme_month = [p[1] for p in extreme_month]
+    max_month = grouped.groupby(level=0)['total_precipitation'].idxmax()
+    min_month = grouped.groupby(level=0)['total_precipitation'].idxmin()
+    max_month = [p[1] for p in max_month]
+    min_month = [p[1] for p in min_month]
+
     # create a new dataframe
-    if max:
-        result = pd.DataFrame({'max_prec_month': extreme_month}, index=grouped.index.levels[0])
-    else:
-        result = pd.DataFrame({'min_prec_month': extreme_month}, index=grouped.index.levels[0])
+    result = pd.DataFrame({'max_prec_month': max_month, 'min_prec_month': min_month},
+                          index=pd.to_datetime(df.index.year.unique(), format='%Y'))
+
     return result
 
 
 # Day of the Year with maximum flow
-
 def peak_doy(df, smoothing_window=7):
     """
     Compute the day of the year with the peak value for each hydrological year.
@@ -104,7 +109,7 @@ def peak_doy(df, smoothing_window=7):
         A DataFrame with the day of the year with the peak value for each hydrological year.
     """
     # resample data to get daily values, forward fill missing values
-    daily_data = df.resample('D').ffill()
+    daily_data = df.total_runoff.resample('D').ffill()
 
     # create hydrological years starting from October 1
     hy_start_dates = pd.date_range(start=daily_data.index[0], end=daily_data.index[-1], freq='AS-OCT')
@@ -137,9 +142,9 @@ def peak_doy(df, smoothing_window=7):
 
     return output_df
 
+peak_doy(df)
 
 # Melting season
-
 def melting_season(df):
     """
     Compute the start, end, and length of the melting season for each calendar year based on the daily mean temperature data provided in the input dataframe.
@@ -189,12 +194,12 @@ def melting_season(df):
 
 def runoff_ratio(df):
     """
-    Calculates the proportion of precipitation that does not infiltrate and or evapotranspirate.
-     Parameters:
+    Calculates the proportion of precipitation that does not infiltrate, evapotranspirate or is stored in ice.
+    Parameters
     -----------
-        df: pandas.DataFrame
+        df : pandas.DataFrame
             DataFrame containing the variables 'total_runoff' and 'total_precipitation'.
-     Returns:
+    Returns
     --------
         pandas.DataFrame
             DataFrame containing the runoff ratio for each observation in the input DataFrame,
@@ -205,13 +210,173 @@ def runoff_ratio(df):
     return pd.DataFrame(data=runoff_ratio, index=df.index, columns=['runoff_ratio'])
 
 
+# Dry periods
+def dry_periods(df, period_length=30):
+    """
+    Compute the number of days for which the rolling mean of evaporation exceeds precipitation for each year in the
+    input DataFrame.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame containing columns 'evap_off_glaciers' and 'prec_off_glaciers' with daily evaporation and
+        precipitation data, respectively.
+    period_length : int, optional
+        Length of the rolling window in days. Default is 30.
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing the number of days for which the rolling mean of evaporation exceeds precipitation for each
+        year in the input DataFrame.
+    """
+
+    # Find number of days when the rolling mean of evaporation exceeds precipitation
+    periods = []
+    for year in df.index.year.unique():
+        year_data = df.loc[df.index.year == year]
+        evap_roll = year_data['evap_off_glaciers'].rolling(window=period_length).mean()
+        prec_roll = year_data['prec_off_glaciers'].rolling(window=period_length).mean()
+
+        dry = evap_roll[evap_roll - prec_roll > 0]
+        periods.append(len(dry))
+
+    # Assemble the output dataframe
+    output_df = pd.DataFrame(
+        {'dry_period_days': periods},
+        index=pd.to_datetime(df.index.year.unique(), format='%Y'))
+
+    return output_df
+
+
+# drought indicators
+def drought_indicators(df: pd.DataFrame, freq='183D') -> pd.DataFrame:
+    """
+    Calculates climatic water balance, Standardized (Evaporation) Precipitation Index (SPI/SPEI), and
+    Standardized Streamflow Index (SSFI) for a given DataFrame with a DatetimeIndex and a given frequency.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame with a datetime index containing columns for 'prec_off_glaciers',
+        'evap_off_glaciers', 'total_precipitation', and 'total_runoff'.
+    freq : str
+        Rolling window frequency in pandas format (e.g. '183D' for 183 days).
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with the datetime index of the input DataFrame and columns for
+        'water_balance', 'spi', 'spei', and 'ssfi'.
+    """
+    water_balance = df.prec_off_glaciers.rolling(freq).sum() - df.evap_off_glaciers.rolling(freq).sum()
+    df_spei = spei.spei(water_balance)  # Input: climatic water balance (prec - pet)
+    df_spi = spei.spi(df.total_precipitation.rolling(freq).sum())  # Input: precipitation
+    df_ssfi = spei.ssfi(df.total_runoff.rolling(freq).sum())  # Input: streamflow data
+
+    # Combine the results into a single DataFrame with the same datetime index as the input DataFrame
+    result_df = pd.concat([water_balance, df_spi, df_spei, df_ssfi], axis=1)
+    result_df.columns = ['water_balance', 'spi', 'spei', 'ssfi']
+
+    return result_df
+
+
+# Hydrological signatures
+def get_qhf(data, global_median, measurements_per_day=1):
+    """
+    Variation of spotpy.hydrology.signatures.get_qhf() that allows definition of a global
+    median to investigate long-term trends.
+    Calculates the frequency of high flow events defined as :math:`Q > 9 \\cdot Q_{50}`
+    cf. [CLBGS2000]_, [WESMCM2015]_. The frequency is given as :math: :math:`yr^{-1}`
+    :param data: the timeseries
+    :param measurements_per_day: the measurements_per_day of the timeseries
+    :return: Q_{HF}, Q_{HD}
+    """
+
+    def highflow(value, median):
+        return value > 9 * median
+
+    fq, md = sig.flow_event(data, highflow, global_median)
+
+    return fq * measurements_per_day * 365, md / measurements_per_day
+
+
+def get_qlf(data, global_mean, measurements_per_day=1):
+    """
+    Variation of spotpy.hydrology.signatures.get_qlf() that allows comparison of
+    individual years with a global mean to investigate long-term trends.
+    Calculates the frequency of low flow events defined as
+    :math:`Q < 0.2 \\cdot \\overline{Q_{mean}}`
+    cf. [CLBGS2000]_, [WESMCM2015]_. The frequency is given
+    in :math:`yr^{-1}` and for the whole timeseries
+    :param data: the timeseries
+    :param measurements_per_day: the measurements_per_day of the timeseries
+    :return: Q_{LF}, Q_{LD}
+    """
+
+    def lowflow(value, mean):
+        return value < 0.2 * mean
+
+    fq, md = sig.flow_event(data, lowflow, global_mean)
+    return fq * measurements_per_day * 365, md / measurements_per_day
+
+
+def hydrological_signatures(df):
+    """
+    Calculate hydrological signatures for a given input dataframe.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame containing a column 'total_runoff' and a DatetimeIndex.
+        The 'total_runoff' column should contain the total runoff values for each timestamp.
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing the calculated hydrological signatures for each year in the input dataframe.
+        The columns of the output dataframe are as follows:
+         - 'q5': the 5th percentile of total runoff for each year
+        - 'q50': the 50th percentile of total runoff for each year
+        - 'q95': the 95th percentile of total runoff for each year
+        - 'qlf_freq': the frequency of low flow events (defined as Q < 2*Qmean_global) for each year, in yr^⁻1
+        - 'qlf_dur': the mean duration of low flow events (defined as Q < 2*Qmean_global) for each year, in days
+        - 'qhf_freq': the frequency of high flow events (defined as Q > 9*Q50_global) for each year, in yr^⁻1
+        - 'qhf_dur': the mean duration of high flow events (defined as Q > 9*Q50_global) for each year, in days
+    """
+    # Create lists of quantile functions to apply and column names
+    functions = [sig.get_q5, sig.get_q50, sig.get_q95]
+    cols = ['q5', 'q50', '95']
+
+    # Create an empty dataframe to store the results
+    results_df = pd.DataFrame()
+
+    # Loop through each year in the input dataframe
+    for year in df.index.year.unique():
+        # Select the data for the current year
+        year_data = df[df.index.year == year].total_runoff
+
+        # Apply each quantile function to the year data and store the results in a dictionary
+        year_results = {}
+        for i, func in enumerate(functions):
+            year_results[cols[i]] = func(year_data)
+
+        # Calculate frequency and duration of global low flows
+        qlf_freq, qlf_dur = get_qlf(year_data, np.mean(df.total_runoff))
+        year_results['qlf_freq'] = qlf_freq
+        year_results['qlf_dur'] = qlf_dur
+
+        #  Calculate frequency and duration of global high flows
+        qhf_freq, qhf_dur = get_qhf(year_data, np.median(df.total_runoff))
+        year_results['qhf_freq'] = qhf_freq
+        year_results['qhf_dur'] = qhf_dur
+
+        # Convert the dictionary to a dataframe and append it to the results dataframe
+        year_results_df = pd.DataFrame(year_results, index=[year])
+        results_df = pd.concat([results_df, year_results_df])
+
+    results_df.set_index(pd.to_datetime(df.index.year.unique(), format='%Y'), inplace=True)
+
+    return results_df
 
 
 ## Long-term annual cycle of evaporation and precipitation for every decade
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+
 
 # Compute the rolling mean of evaporation and precipitation
 df_avg = df[['prec_off_glaciers', 'evap_off_glaciers']].rolling(window=30).mean()
@@ -271,63 +436,3 @@ fig.subplots_adjust(bottom=0.06, top=0.92)
 # Show the plot
 plt.show()
 
-
-## Hydrological signatures
-
-import spotpy.hydrology.signatures as sig
-
-# Time series:
-sig.calc_baseflow(test)         # 5-day baseflow
-# Two outputs:
-sig.get_qlf(test)               # frequency and mean duration of low flow events defined as Q < 2⋅Qmean per year
-sig.get_qhf(test)               # frequency and mean duration of high flow events defined as Q > 9⋅Q50 per year
-# one ouput:
-sig.get_bfi(test)               # baseflow index
-sig.get_q5(test)                # Quantiles....
-sig.get_q50(test)
-sig.get_q95(test)
-sig.get_qcv(test)               # variation coeff
-sig.get_qhv(test)               # high flow variability
-sig.get_qlv(test)               # low flow variability
-sig.get_sfdc(test)              # slope in the middle part of the flow duration curve
-
-
-##
-def dry_periods(df, period_length=30):
-    """
-    Compute the number of days for which the rolling mean of evaporation exceeds precipitation for each year in the
-    input DataFrame.
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Input DataFrame containing columns 'evap_off_glaciers' and 'prec_off_glaciers' with daily evaporation and
-        precipitation data, respectively.
-    period_length : int, optional
-        Length of the rolling window in days. Default is 30.
-    Returns
-    -------
-    pandas.DataFrame
-        DataFrame containing the number of days for which the rolling mean of evaporation exceeds precipitation for each
-        year in the input DataFrame.
-    """
-
-    # Find number of days when the rolling mean of evaporation exceeds precipitation
-    periods = []
-    for year in df.index.year.unique():
-        year_data = df.loc[df.index.year == year]
-        evap_roll = year_data['evap_off_glaciers'].rolling(window=period_length).mean()
-        prec_roll = year_data['prec_off_glaciers'].rolling(window=period_length).mean()
-
-        dry = evap_roll[evap_roll - prec_roll > 0]
-        periods.append(len(dry))
-
-    # Assemble the output dataframe
-    output_df = pd.DataFrame(
-        {'dry_period_days': periods},
-        index=pd.to_datetime(df.index.year.unique(), format='%Y'))
-
-    return output_df
-
-
-dry_periods(df).plot()
-plt.show()
