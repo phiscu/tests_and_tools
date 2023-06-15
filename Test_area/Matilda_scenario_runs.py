@@ -243,8 +243,8 @@ class MatildaBulkProcessor:
     @staticmethod
     def matilda_headless(df, matilda_settings, matilda_parameters):
         """
-        A helper function to run a single MATILDA simulation given a dataframe, MATILDA settings and parameter
-        values.
+        A helper function to run a single MATILDA simulation without prints given a dataframe,
+        MATILDA settings and parameter values.
         Parameters
         ----------
         df : pandas.DataFrame
