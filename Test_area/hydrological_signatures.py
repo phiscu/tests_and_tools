@@ -31,11 +31,58 @@ def pickle_to_dict(file_path):
     return dic
 
 
-matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')   # pickle for speed/parquet for size
+def dict_to_parquet(dictionary: dict, directory_path: str, pbar: bool = True) -> None:
+    """
+    Recursively stores the dataframes in the input dictionary as parquet files in the specified directory.
+    Nested dictionaries are supported. If the specified directory does not exist, it will be created.
+    Parameters
+    ----------
+    dictionary : dict
+        A nested dictionary containing pandas dataframes.
+    directory_path : str
+        The directory path to store the parquet files.
+    pbar : bool, optional
+        A flag indicating whether to display a progress bar. Default is True.
+    """
+    if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
+    if pbar:
+        bar_iter = tqdm(dictionary.items(), desc='Writing parquet files: ')
+    else:
+        bar_iter = dictionary.items()
+    for k, v in bar_iter:
+        if isinstance(v, dict):
+            dict_to_parquet(v, os.path.join(directory_path, k), pbar=False)
+        else:
+            file_path = os.path.join(directory_path, k + ".parquet")
+            write(file_path, v, compression='GZIP')
 
+
+def dict_to_pickle(dic, target_path):
+    """
+    Saves a dictionary to a pickle file at the specified target path.
+    Creates target directory if not existing.
+    Parameters
+    ----------
+    dic : dict
+        The dictionary to save to a pickle file.
+    target_path : str
+        The path of the file where the dictionary shall be stored.
+    Returns
+    -------
+    None
+    """
+    target_dir = os.path.dirname(target_path)
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+
+    with open(target_path, 'wb') as f:
+        pickle.dump(dic, f)
+
+
+matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')   # pickle for speed/parquet for size
 df = matilda_scenarios['SSP2']['EC-Earth3']['model_output']
-df2 = matilda_scenarios['SSP2']['EC-Earth3']['glacier_rescaling']
-test = df['total_runoff']
+
 
 # print(df.columns)
 # print(df2.columns)
@@ -147,7 +194,6 @@ def prec_minmax(df):
                           index=pd.to_datetime(df.water_year.unique(), format='%Y'))
     return result
 
-
 # Day of the Year with maximum flow
 def peak_doy(df, smoothing_window_peakdoy=7):
     """
@@ -189,7 +235,6 @@ def peak_doy(df, smoothing_window_peakdoy=7):
     output_df = output_df.drop('Hydrological Year', axis=1)
 
     return output_df
-
 
 # Melting season
 def melting_season(df, smoothing_window_meltseas=14, min_weeks=10):
@@ -250,7 +295,6 @@ def melting_season(df, smoothing_window_meltseas=14, min_weeks=10):
 
     return output_df
 
-
 # Dry periods
 def dry_periods(df, dry_period_length=30):
     """
@@ -288,7 +332,6 @@ def dry_periods(df, dry_period_length=30):
 
     return output_df
 
-
 # Hydrological signatures
 def get_qhf(data, global_median, measurements_per_day=1):
     """
@@ -308,7 +351,6 @@ def get_qhf(data, global_median, measurements_per_day=1):
 
     return fq * measurements_per_day * 365, md / measurements_per_day
 
-
 def get_qlf(data, global_mean, measurements_per_day=1):
     """
     Variation of spotpy.hydrology.signatures.get_qlf() that allows comparison of
@@ -327,7 +369,6 @@ def get_qlf(data, global_mean, measurements_per_day=1):
 
     fq, md = sig.flow_event(data, lowflow, global_mean)
     return fq * measurements_per_day * 365, md / measurements_per_day
-
 
 def hydrological_signatures(df):
     """
@@ -383,6 +424,106 @@ def hydrological_signatures(df):
 
     return results_df
 
+# Drought indicators
+def drought_indicators(df, freq='M', dist='gamma'):
+    """
+    Calculate the climatic water balance, SPI (Standardized Precipitation Index), and
+    SPEI (Standardized Precipitation Evapotranspiration Index) for 1, 3, 6, 12, and 24 months..
+    Parameters
+    ----------
+    df : pandas.DataFrame
+         Input DataFrame containing columns 'prec_off_glaciers' and 'evap_off_glaciers'.
+    freq : str, optional
+         Resampling frequency for precipitation and evaporation data. Default is 'M' for monthly.
+    dist : str, optional
+         Distribution for SPI and SPEI calculation. Either Pearson-Type III ('pearson') or
+         Gamma distribution ('gamma'). Default is 'gamma'.
+    Returns
+    -------
+    pandas.DataFrame
+         DataFrame containing the calculated indicators: 'clim_water_balance', 'spi', and 'spei'.
+         Index is based on the resampled frequency of the input DataFrame.
+    Raises
+    ------
+    ValueError
+         If 'freq' is not 'D' or 'M'.
+         If 'dist' is not 'pearson' or 'gamma'.
+    Notes
+    -----
+    SPI (Standardized Precipitation Index) and SPEI (Standardized Precipitation Evapotranspiration Index)
+    are drought indicators that are used to quantify drought severity and duration.
+    'clim_water_balance' is the difference between total precipitation and total evapotranspiration.
+    If 'freq' is 'D', the input data is transformed from Gregorian to a 366-day format for SPI and SPEI calculation,
+    and then transformed back to Gregorian format for output.
+    The default distribution for SPI and SPEI calculation is Gamma.
+    The calibration period for SPI and SPEI calculation is th full data range from 1981 to 2100.
+    """
+    # Check if frequency is valid
+    if freq != 'D' and freq != 'M':
+        raise ValueError("Invalid value for 'freq'. Choose either 'D' or 'M'.")
+
+    # Resample precipitation and evaporation data based on frequency
+    prec = df.prec_off_glaciers.resample(freq).sum().values
+    evap = df.evap_off_glaciers.resample(freq).sum().values
+
+    # Calculate water balance
+    water_balance = prec - evap
+
+    # If frequency is daily, transform data to 366-day format
+    if freq == 'D':
+        prec = utils.transform_to_366day(prec, year_start=df.index.year[0],
+                                         total_years=len(df.index.year.unique()))
+        evap = utils.transform_to_366day(evap, year_start=df.index.year[0],
+                                         total_years=len(df.index.year.unique()))
+
+    # Set distribution based on input
+    if dist == 'pearson':
+        distribution = Distribution.pearson
+    elif dist == 'gamma':
+        distribution = Distribution.gamma
+    else:
+        raise ValueError("Invalid value for 'dist'. Choose either 'pearson' or 'gamma'.")
+
+    # Set periodicity based on frequency
+    if freq == 'D':
+        periodicity = compute.Periodicity.daily
+    elif freq == 'M':
+        periodicity = compute.Periodicity.monthly
+
+    # Set common parameters
+    common_params = {'distribution': distribution,
+                     'periodicity': periodicity,
+                     'data_start_year': 1981,
+                     'calibration_year_initial': 1981,
+                     'calibration_year_final': 2100}
+
+    # Set parameters for SPEI calculation
+    spei_params = {'precips_mm': prec,
+                   'pet_mm': evap,
+                   **common_params}
+
+    # Set parameters for SPI calculation
+    spi_params = {'values': prec,
+                  **common_params}
+
+    # Calculate SPI and SPEI for various periods
+    drought_df = pd.DataFrame()
+    for s in [1, 3, 6, 12, 24]:
+        spi_arr = spi(**spi_params, scale=s)
+        spei_arr = spei(**spei_params, scale=s)
+        # If frequency is daily, transform data back to Gregorian format
+        if freq == 'D':
+            spi_arr = utils.transform_to_gregorian(spi_arr, df.index.year[0])
+            spei_arr = utils.transform_to_gregorian(spei_arr, df.index.year[0])
+        drought_df['spi' + str(s)] = spi_arr
+        drought_df['spei' + str(s)] = spei_arr
+    drought_df.set_index(df.resample(freq).mean().index, inplace=True)
+
+    # DataFrame resample Dataframe
+    out_df = pd.DataFrame({'clim_water_balance': water_balance}, index=df.resample(freq).sum().index)
+    out_df = pd.concat([out_df.resample('YS').sum(), drought_df.resample('YS').mean()], axis=1).rename(lambda x: x.replace(day=1))
+
+    return out_df
 
 # Wrapper function
 import inspect
@@ -409,7 +550,7 @@ def cc_indicators(df, **kwargs):
      If no optional arguments are passed, the function is applied to the input DataFrame with default arguments.
     """
     # List of all functions to apply
-    functions = [prec_minmax, peak_doy, melting_season, dry_periods, hydrological_signatures]
+    functions = [prec_minmax, peak_doy, melting_season, dry_periods, hydrological_signatures, drought_indicators]
     # Empty result dataframe
     indicator_df = pd.DataFrame()
     # Loop through all functions
@@ -426,128 +567,311 @@ def cc_indicators(df, **kwargs):
     return indicator_df
 
 
-## Drought indicators
-def drought_indicators(df, freq='M', period=1, dist='pearson'):
-    """
-    Calculate the climatic water balance, SPI (Standardized Precipitation Index) and
-    SPEI (Standardized Precipitation Evapotranspiration Index)
-    Parameters
-    ----------
-    df : pandas.DataFrame
-         Input DataFrame containing columns 'prec_off_glaciers' and 'evap_off_glaciers'.
-    freq : str, optional
-         Resampling frequency for precipitation and evaporation data. Default is 'M' for monthly.
-    period : int, optional
-         Period for SPI and SPEI calculation. Default is 1.
-    dist : str, optional
-         Distribution type for SPI and SPEI calculation. Choose either 'pearson' or 'gamma'. Default is 'pearson'.
-    Returns
-    -------
-    pandas.DataFrame
-         DataFrame containing the calculated indicators: 'clim_water_balance', 'spi', and 'spei'.
-         Index is based on the resampled frequency of the input DataFrame.
-    Raises
-    ------
-    ValueError
-         If 'freq' is not 'D' or 'M'.
-         If 'dist' is not 'pearson' or 'gamma'.
-     Notes
-    -----
-    SPI (Standardized Precipitation Index) and SPEI (Standardized Precipitation Evapotranspiration Index)
-    are drought indicators that are used to quantify drought severity and duration.
-     'clim_water_balance' is the difference between total precipitation and total evapotranspiration.
-     If 'freq' is 'D', the input data is transformed from Gregorian to a 366-day format for SPI and SPEI calculation,
-    and then transformed back to Gregorian format for output.
-     The default period for SPI and SPEI calculation is 1 month.
-     The default distribution for SPI and SPEI calculation is Pearson Type III.
-     The calibration period for SPI and SPEI calculation is from 1981 to 2020.
-    """
 
-    # Check if frequency is valid
-    if freq != 'D' and freq != 'M':
-        raise ValueError("Invalid value for 'freq'. Choose either 'D' or 'M'.")
-
-    # Resample precipitation and evaporation data based on frequency
-    prec = df.prec_off_glaciers.resample(freq).sum().values
-    evap = df.evap_off_glaciers.resample(freq).sum().values
-
-    # Calculate water balance
-    water_balance = prec - evap
-
-    # If frequency is daily, transform data to 366-day format
-    if freq == 'D':
-        prec = utils.transform_to_366day(prec, year_start=df.index.year[0],
-                                         total_years=len(df.index.year.unique()))
-        evap = utils.transform_to_366day(evap, year_start=df.index.year[0],
-                                         total_years=len(df.index.year.unique()))
-
-    # Set distribution based on input
-    if dist == 'pearson':
-        distribution = Distribution.pearson
-    elif dist == 'gamma':
-        distribution = Distribution.pearson
-    else:
-        raise ValueError("Invalid value for 'dist'. Choose either 'pearson' or 'gamma'.")
-
-    # Set periodicity based on frequency
-    if freq == 'D':
-        periodicity = compute.Periodicity.daily
-    elif freq == 'M':
-        periodicity = compute.Periodicity.monthly
-
-    # Set common parameters
-    common_params = {'scale': period,
-                     'distribution': distribution,
-                     'periodicity': periodicity,
-                     'data_start_year': 1981,
-                     'calibration_year_initial': 1981,
-                     'calibration_year_final': 2020}
-
-    # Set parameters for SPEI calculation
-    spei_params = {'precips_mm': prec,
-                   'pet_mm': evap,
-                   **common_params}
-
-    # Set parameters for SPI calculation
-    spi_params = {'values': prec,
-                  **common_params}
-
-    # Calculate SPI and SPEI
-    spi_arr = spi(**spi_params)
-    spei_arr = spei(**spei_params)
-
-    # If frequency is daily, transform data back to Gregorian format
-    if freq == 'D':
-        spi_arr = utils.transform_to_gregorian(spi_arr, df.index.year[0])
-        spei_arr = utils.transform_to_gregorian(spei_arr, df.index.year[0])
-
-    # Return a DataFrame containing the calculated indicators
-    return pd.DataFrame({'clim_water_balance': water_balance,
-                         'spi': spi_arr,
-                         'spei': spei_arr
-                         }, index=df.resample(freq).sum().index)
 
 
 ## Performance check
-%%time
-print('prec_minmax')
-%time prec_minmax(df)
-print('peak_doy')
-%time peak_doy(df)
-print('melting_season')
-%time melting_season(df)
-print('dry_periods')
-%time dry_periods(df)
-print('hydrological_signatures')
-%time hydrological_signatures(df)
-print('drought_indicators')
-%time drought_indicators(df, 'D')        # very slow in the first iteration, fast afterwards
-print()
+# %%time
+# print('prec_minmax')
+# %time prec_minmax(df)
+# print('peak_doy')
+# %time peak_doy(df)
+# print('melting_season')
+# %time melting_season(df)
+# print('dry_periods')
+# %time dry_periods(df)
+# print('hydrological_signatures')
+# %time hydrological_signatures(df)
+# print('drought_indicators')
+# %time drought_indicators(df, 'D')        # very slow in the first iteration, fast afterwards
+# print()
+
+
+## Loop indicator function over all models
+
+def calculate_indicators(dic, **kwargs):
+    """
+    Calculate climate change indicators for all scenarios and models.
+    Parameters
+    ----------
+    dic : dict
+        Dictionary containing MATILDA outputs for all scenarios and models.
+    **kwargs : optional
+        Optional keyword arguments to be passed to the cc_indicators() function.
+    Returns
+    -------
+    dict
+        Dictionary with the same structure as the input but containing climate change indicators in annual resolution.
+    """
+    # Create an empty dictionary to store the outputs
+    out_dict = {}
+    # Loop over the scenarios with progress bar
+    for scenario in dic.keys():
+        model_dict = {}  # Create an empty dictionary to store the model outputs
+        # Loop over the models with progress bar
+        for model in tqdm(dic[scenario].keys(), desc=scenario):
+            # Get the dataframe for the current scenario and model
+            df = dic[scenario][model]['model_output']
+            # Run the indicator function
+            indicators = cc_indicators(df, **kwargs)
+            # Store indicator time series in the model dictionary
+            model_dict[model] = indicators
+        # Store the model dictionary in the scenario dictionary
+        out_dict[scenario] = model_dict
+
+    return out_dict
+
+
+# matilda_indicators = calculate_indicators(matilda_scenarios)
+# dict_to_parquet(matilda_indicators, test_dir + 'adjusted/matilda_indicators.parquet')
+# dict_to_pickle(matilda_indicators, test_dir + 'adjusted/matilda_indicators.pickle')
+matilda_indicators = pickle_to_dict(test_dir + 'adjusted/matilda_indicators.pickle')
+
+## Store variable names and respective plot labels
+var_name = ['max_prec_month', 'min_prec_month',
+            'peak_day',
+            'melt_season_start', 'melt_season_end', 'melt_season_length',
+            'dry_period_days',
+            'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur',
+            'clim_water_balance', 'spi1', 'spei1', 'spi3', 'spei3', 'spi6', 'spei6', 'spi12', 'spei12', 'spi24', 'spei24']
+
+title = ['Month with Maximum Precipitation', 'Month with Minimum Precipitation',
+         'Timing of Peak Runoff',
+         'Beginning of Melt Season', 'End of Melt Season', 'Length of Melt Season',
+         'Total Length of Dry Periods',
+         'Frequency of Low-flow events', 'Mean Duration of Low-flow events',
+         'Frequency of High-flow events', 'Mean Duration of High-flow events',
+         'Climatic Water Balance',
+         'Standardized Precipitation Index (1 month)', 'Standardized Precipitation Evaporation Index (1 month)',
+         'Standardized Precipitation Index (3 months)', 'Standardized Precipitation Evaporation Index (3 months)',
+         'Standardized Precipitation Index (6 months)', 'Standardized Precipitation Evaporation Index (6 months)',
+         'Standardized Precipitation Index (12 months)', 'Standardized Precipitation Evaporation Index (12 months)',
+         'Standardized Precipitation Index (24 months)', 'Standardized Precipitation Evaporation Index (24 months)']
+
+unit = ['-', '-',
+        'DoY',
+        'DoY', 'DoY', 'days',
+        'days',
+        'yr^-1', 'days', 'yr^-1', 'days',
+        'mm w.e.', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-']
+
+output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
+
+## Create custom df for individual plot
+def custom_df(dic, scenario, var):
+
+    out_cols = ['max_prec_month', 'min_prec_month',
+                'peak_day',
+                'melt_season_start', 'melt_season_end', 'melt_season_length',
+                'dry_period_days',
+                'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur',
+                 'clim_water_balance', 'spi1', 'spei1', 'spi3', 'spei3',
+                 'spi6', 'spei6', 'spi12', 'spei12', 'spi24', 'spei24']
+
+    if var not in out_cols:
+        raise ValueError("var needs to be one of the following strings: " +
+                         str([i for i in out_cols]))
+
+    # Create an empty list to store the dataframes
+    dfs = []
+    # Loop over the models in the selected scenario
+    for model in dic[scenario].keys():
+        # Get the dataframe for the current model
+        df = dic[scenario][model]
+        # Append the dataframe to the list of dataframes
+        dfs.append(df[var])
+    # Concatenate the dataframes into a single dataframe
+    combined_df = pd.concat(dfs, axis=1)
+    # Set the column names of the combined dataframe to the model names
+    combined_df.columns = dic[scenario].keys()
+
+    return combined_df
+
+
+## Plot functions
+
+import plotly.graph_objects as go
+import numpy as np
+import plotly.io as pio
+pio.renderers.default = "browser"
+
+def confidence_interval(df):
+    """
+    Calculate the mean and 95% confidence interval for each row in a dataframe.
+    Parameters:
+    -----------
+        df (pandas.DataFrame): The input dataframe.
+    Returns:
+    --------
+        pandas.DataFrame: A dataframe with the mean and confidence intervals for each row.
+    """
+    mean = df.mean(axis=1)
+    std = df.std(axis=1)
+    count = df.count(axis=1)
+    ci = 1.96 * std / np.sqrt(count)
+    ci_lower = mean - ci
+    ci_upper = mean + ci
+    df_ci = pd.DataFrame({'mean': mean, 'ci_lower': ci_lower, 'ci_upper': ci_upper})
+    return df_ci
+
+def plot_wit_ci(var, dic, show=False):
+    """
+    A function to plot multi-model mean and confidence intervals of a given variable for two different scenarios.
+    Parameters:
+    -----------
+    var: str
+        The variable to plot.
+    dic: dict, optional (default=matilda_scenarios)
+        A dictionary containing the scenarios as keys and the dataframes as values.
+    resample_freq: str, optional (default='Y')
+        The resampling frequency to apply to the data.
+    show: bool, optional (default=False)
+        Whether to show the resulting plot or not.
+    Returns:
+    --------
+    go.Figure
+        A plotly figure object containing the mean and confidence intervals for the given variable in the two selected scenarios.
+    """
+
+    if var is None:
+        var = 'total_runoff'       # Default if nothing selected
+
+    # SSP2
+    df1 = custom_df(dic, scenario='SSP2', var=var)
+    df1_ci = confidence_interval(df1)
+    # SSP5
+    df2 = custom_df(dic, scenario='SSP5', var=var)
+    df2_ci = confidence_interval(df2)
+
+    fig = go.Figure([
+        # SSP2
+        go.Scatter(
+            name='SSP2',
+            x=df1_ci.index,
+            y=round(df1_ci['mean'], 2),
+            mode='lines',
+            line=dict(color='darkorange'),
+        ),
+        go.Scatter(
+            name='95% CI Upper',
+            x=df1_ci.index,
+            y=round(df1_ci['ci_upper'], 2),
+            mode='lines',
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            showlegend=False
+        ),
+        go.Scatter(
+            name='95% CI Lower',
+            x=df1_ci.index,
+            y=round(df1_ci['ci_lower'], 2),
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            mode='lines',
+            fillcolor='rgba(255, 165, 0, 0.3)',
+            fill='tonexty',
+            showlegend=False
+        ),
+
+        # SSP5
+        go.Scatter(
+            name='SSP5',
+            x=df2_ci.index,
+            y=round(df2_ci['mean'], 2),
+            mode='lines',
+            line=dict(color='darkblue'),
+        ),
+        go.Scatter(
+            name='95% CI Upper',
+            x=df2_ci.index,
+            y=round(df2_ci['ci_upper'], 2),
+            mode='lines',
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            showlegend=False
+        ),
+        go.Scatter(
+            name='95% CI Lower',
+            x=df2_ci.index,
+            y=round(df2_ci['ci_lower'], 2),
+            marker=dict(color='#444'),
+            line=dict(width=0),
+            mode='lines',
+            fillcolor='rgba(0, 0, 255, 0.3)',
+            fill='tonexty',
+            showlegend=False
+        )
+    ])
+    fig.update_layout(
+        xaxis_title='Year',
+        yaxis_title=output_vars[var][0] + ' [' + output_vars[var][1] + ']',
+        title={'text': '<b>' + output_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
+        legend={'font': {'size': 18, 'family': 'Arial'}},
+        hovermode='x',
+        plot_bgcolor='rgba(255, 255, 255, 1)',  # Set the background color to white
+        margin=dict(l=10, r=10, t=90, b=10),  # Adjust the margins to remove space around the plot
+        xaxis=dict(gridcolor='lightgrey'),  # set the grid color of x-axis to lightgrey
+        yaxis=dict(gridcolor='lightgrey'),  # set the grid color of y-axis to lightgrey
+    )
+    fig.update_yaxes(rangemode='tozero')
+
+    # show figure
+    if show:
+        fig.show()
+
+    return fig
+
+
+plot_wit_ci('qlf_freq', matilda_indicators, show=True)
+
+
+
+
+# DoY to Date?
 
 
 ##
 
-matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
+import dash
+from dash import dcc
+from dash import html
+from dash.dependencies import Input, Output
+import plotly.io as pio
+
+pio.renderers.default = "browser"
+app = dash.Dash()
+
+# Create the initial line plot
+fig = plot_wit_ci('melt_season_length', matilda_indicators)
+
+# Create the callback function
+@app.callback(
+    Output('line-plot', 'figure'),
+    Input('arg-dropdown', 'value'))
+def update_figure(selected_arg):
+    return plot_wit_ci(selected_arg, matilda_indicators)
+
+# Define the dropdown menu for variable
+arg_dropdown = dcc.Dropdown(
+    id='arg-dropdown',
+    options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
+    value='melt_season_length',
+    clearable=False,
+    style={'width': '250px'})
+
+# Add the dropdown menus to the layout and use CSS to place them next to each other
+app.layout = html.Div([
+    html.Div([
+        html.Label("Variable:"),
+        arg_dropdown,
+    ], style={'display': 'inline-block', 'margin-right': '30px'}),
+    dcc.Graph(id='line-plot', figure=fig)
+])
+
+# Run the app
+app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside jupyter
+
+
 
 
 ## Long-term annual cycle of evaporation and precipitation for every decade
@@ -706,86 +1030,6 @@ matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle
 #
 # fig.show()
 #
-
-##
-
-# Design plotting function that runs every indicator function depending on the chosen var_name --> Might result in processing time when choosing certain vars
-# OR
-# Run all functions for every model and create an indicator-df --> will result in a long processing time! ~ 6s * 31 models = 3min
-
-var_name = ['max_prec_month', 'min_prec_month',
-            'peak_day',
-            'melt_season_start', 'melt_season_end', 'melt_season_length',
-            'dry_period_days',
-            'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur',
-            'water_balance', 'spi', 'spei']
-
-title = ['Month with Maximum Precipitation', 'Month with Minimum Precipitation',
-         'Timing of Peak Runoff',
-         'Beginning of Melt Season', 'End of Melt Season', 'Length of Melt Season',
-         'Total Length of Dry Periods',
-         'Frequency of Low-flow events', 'Mean Duration of Low-flow events',
-         'Frequency of High-flow events', 'Mean Duration of High-flow events',
-         'Climatic Water Balance', 'Standardized Precipitation Index', 'Standardized Precipitation Evaporation Index']
-
-unit = ['-', '-',
-        'DoY',
-        'DoY', 'DoY', 'days',
-        'days',
-        'yr^-1', 'days', 'yr^-1', 'days',
-        'mm w.e.', '-', '-']
-
-output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
-
-
-def custom_df(dic, scenario, var, **kwargs):
-
-    out1_cols = ['max_prec_month', 'min_prec_month',
-                'peak_day',
-                'melt_season_start', 'melt_season_end', 'melt_season_length',
-                'dry_period_days',
-                'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur']
-    out2_cols = ['water_balance', 'spi', 'spei']
-
-    if var in out1_cols:
-        func = cc_indicators
-    elif var in out2_cols:
-        func = drought_indicators
-    else:
-        raise ValueError("var needs to be one of the following strings: " +
-                         str([i for i in [out1_cols, out2_cols]]))
-
-    # Create an empty list to store the dataframes
-    dfs = []
-    # Loop over the models in the selected scenario
-    for model in dic[scenario].keys():
-        # Get the dataframe for the current model
-        if var in out1_cols:
-            df = func(dic[scenario][model]['model_output'], **kwargs)
-        else:
-            df = func(dic[scenario][model]['model_output'])
-
-
-
-
-
-
-            # SO WIRD DAS NICHT GEHEN, WEIL JEDE ITERATION 14 SPALTEN HAT
-            # --> ERSTMAL DURCH ALLE MODELLE LOOPEN UND ZWEI ZUSÄTZLICHE OUTPUT_DF HINZUFÜGEN.
-
-
-
-
-
-
-        # Append the dataframe to the list of dataframes
-        dfs.append(df[var])
-    # Concatenate the dataframes into a single dataframe
-    combined_df = pd.concat(dfs, axis=1)
-    # Set the column names of the combined dataframe to the model names
-    combined_df.columns = dic[scenario].keys()
-
-
 
 
 
