@@ -1,6 +1,5 @@
 import pickle
 import numpy as np
-import spei
 import spotpy.hydrology.signatures as sig
 from climate_indices.indices import spei, spi, Distribution
 from climate_indices import compute, utils
@@ -84,30 +83,9 @@ matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle
 df = matilda_scenarios['SSP2']['EC-Earth3']['model_output']
 
 
-# print(df.columns)
-# print(df2.columns)
+print(df.columns)
 
-
-## What to analyze?
-
-# Annual stats
-    # Month with highest precipitation
-    # DoY with highest Runoff
-    # start, end, and length of melting season:
-        # melt variables depend on availability of snow/ice AND temperature!
-        # Temperature might be better --> three consecutive days above 0°C
-    # length an frequency of dry periods
-        # precipitation >/< potential evap
-
-# Time series to integrate in MATILDA
-    # frozen water storage
-    # total runoff ratio (runoff/precipitation)
-    # Standardized Precipitation Evapotranspiration Index (SPEI)
 ## Functions
-
-# DIE MEISTEN FUNKTIONEN AUF HYDROLOGISCHE JAHRE UMSTELLEN!!
-
-# Convert to hydrological time series
 
 ## Helper functions
 def water_year(df, begin=10):
@@ -194,6 +172,7 @@ def prec_minmax(df):
                           index=pd.to_datetime(df.water_year.unique(), format='%Y'))
     return result
 
+
 # Day of the Year with maximum flow
 def peak_doy(df, smoothing_window_peakdoy=7):
     """
@@ -235,6 +214,7 @@ def peak_doy(df, smoothing_window_peakdoy=7):
     output_df = output_df.drop('Hydrological Year', axis=1)
 
     return output_df
+
 
 # Melting season
 def melting_season(df, smoothing_window_meltseas=14, min_weeks=10):
@@ -295,17 +275,70 @@ def melting_season(df, smoothing_window_meltseas=14, min_weeks=10):
 
     return output_df
 
-# Dry periods
-def dry_periods(df, dry_period_length=30):
+
+# Aridity
+def aridity(df, hist_starty=1986, hist_endy=2015):
     """
-    Compute the number of days for which the rolling mean of evaporation exceeds precipitation for each hydrological
-    year in the input DataFrame.
+    Calculates aridity indexes from precipitation, and potential and actual evaporation respectively. Aridity is defined
+    as mean annual ratio of potential/actual evapotranspiration and precipitation. The indexes are defined as the
+    relative change of a 30 years period compared to a given historical period. Uses hydrological years (Oct - Sep).
+    Inspired by climateinformation.org (https://doi.org/10.5194/egusphere-egu23-16216).
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame containing columns 'evap_off_glaciers', 'actual_evaporation', and 'prec_off_glaciers'.
+    hist_starty : int, optional
+        Start year of the historical period in YYYY format. Default is 1986.
+    hist_endy : int, optional
+        End year of the historical period in YYYY format. Default is 2015.
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing the relative change in aridity over time.
+        Columns:
+            - 'actual_aridity': Relative change in actual aridity.
+            - 'potential_aridity': Relative change in potential aridity.
+    """
+    # Use water years
+    df = hydrologicalize(df)
+    # Potential evapotranspiration (PET)
+    pet = df['evap_off_glaciers']
+    # Actual evapotranspiration (AET)
+    aet = df['actual_evaporation']
+    # Precipitation
+    prec = df['prec_off_glaciers']
+    # Calculate the potential aridity as ratio of AET/PET to precipitation
+    aridity_pot = pet.groupby(df['water_year']).sum() / prec.groupby(df['water_year']).sum()
+    aridity_act = aet.groupby(df['water_year']).sum() / prec.groupby(df['water_year']).sum()
+    # Filter historical period
+    hist_pot = aridity_pot[(aridity_pot.index >= hist_starty) & (aridity_pot.index <= hist_endy)].mean()
+    hist_act = aridity_act[(aridity_act.index >= hist_starty) & (aridity_act.index <= hist_endy)].mean()
+    # Calculate rolling mean with a 30y period
+    aridity_pot_rolling = aridity_pot.rolling(window=30).mean()
+    aridity_act_rolling = aridity_act.rolling(window=30).mean()
+    # Calculate the relative change in the aridity indexes
+    pot_rel = 100 * (aridity_pot_rolling - hist_pot) / hist_pot
+    act_rel = 100 * (aridity_act_rolling - hist_act) / hist_act
+    # Concat in one dataframe
+    aridity = pd.DataFrame({'actual_aridity': act_rel, 'potential_aridity': pot_rel})
+    aridity.set_index(pd.to_datetime(df.water_year.unique(), format='%Y'), inplace=True)
+    aridity = aridity.dropna()
+
+
+    return aridity
+
+
+# Dry spells
+def dry_spells(df, dry_spell_length=5):
+    """
+    Compute the total length of dry spells in days per year. A dry spell is defined as a period for which the rolling
+    mean of evaporation in a given window exceeds precipitation. Uses hydrological years (Oct - Sep).
     Parameters
     ----------
     df : pandas.DataFrame
         Input DataFrame containing columns 'evap_off_glaciers' and 'prec_off_glaciers' with daily evaporation and
         precipitation data, respectively.
-    dry_period_length : int, optional
+    dry_spell_length : int, optional
         Length of the rolling window in days. Default is 30.
     Returns
     -------
@@ -319,18 +352,19 @@ def dry_periods(df, dry_period_length=30):
     periods = []
     for year in df.water_year.unique():
         year_data = df.loc[df.water_year == year]
-        evap_roll = year_data['evap_off_glaciers'].rolling(window=dry_period_length).mean()
-        prec_roll = year_data['prec_off_glaciers'].rolling(window=dry_period_length).mean()
+        evap_roll = year_data['evap_off_glaciers'].rolling(window=dry_spell_length).mean()
+        prec_roll = year_data['prec_off_glaciers'].rolling(window=dry_spell_length).mean()
 
         dry = evap_roll[evap_roll - prec_roll > 0]
         periods.append(len(dry))
 
     # Assemble the output dataframe
     output_df = pd.DataFrame(
-        {'dry_period_days': periods},
+        {'dry_spell_days': periods},
         index=pd.to_datetime(df.water_year.unique(), format='%Y'))
 
     return output_df
+
 
 # Hydrological signatures
 def get_qhf(data, global_median, measurements_per_day=1):
@@ -351,6 +385,7 @@ def get_qhf(data, global_median, measurements_per_day=1):
 
     return fq * measurements_per_day * 365, md / measurements_per_day
 
+
 def get_qlf(data, global_mean, measurements_per_day=1):
     """
     Variation of spotpy.hydrology.signatures.get_qlf() that allows comparison of
@@ -369,6 +404,7 @@ def get_qlf(data, global_mean, measurements_per_day=1):
 
     fq, md = sig.flow_event(data, lowflow, global_mean)
     return fq * measurements_per_day * 365, md / measurements_per_day
+
 
 def hydrological_signatures(df):
     """
@@ -423,6 +459,7 @@ def hydrological_signatures(df):
     results_df.set_index(pd.to_datetime(df.water_year.unique(), format='%Y'), inplace=True)
 
     return results_df
+
 
 # Drought indicators
 def drought_indicators(df, freq='M', dist='gamma'):
@@ -525,6 +562,7 @@ def drought_indicators(df, freq='M', dist='gamma'):
 
     return out_df
 
+
 # Wrapper function
 import inspect
 def cc_indicators(df, **kwargs):
@@ -534,10 +572,10 @@ def cc_indicators(df, **kwargs):
     Parameters
     ----------
     df : pandas.DataFrame
-        Input DataFrame containing columns 'A' and 'B'.
+        Input DataFrame.
     **kwargs : optional
         Optional arguments to be passed to the functions in the list. Possible arguments are 'smoothing_window_peakdoy',
-        'smoothing_window_meltseas', 'min_weeks', and 'dry_period_length'.
+        'smoothing_window_meltseas', 'min_weeks', and 'dry_spell_length'.
     Returns
     -------
     pandas.DataFrame
@@ -550,7 +588,7 @@ def cc_indicators(df, **kwargs):
      If no optional arguments are passed, the function is applied to the input DataFrame with default arguments.
     """
     # List of all functions to apply
-    functions = [prec_minmax, peak_doy, melting_season, dry_periods, hydrological_signatures, drought_indicators]
+    functions = [prec_minmax, peak_doy, melting_season, aridity, dry_spells, hydrological_signatures, drought_indicators]
     # Empty result dataframe
     indicator_df = pd.DataFrame()
     # Loop through all functions
@@ -567,9 +605,6 @@ def cc_indicators(df, **kwargs):
     return indicator_df
 
 
-
-
-
 ## Performance check
 # %%time
 # print('prec_minmax')
@@ -578,8 +613,10 @@ def cc_indicators(df, **kwargs):
 # %time peak_doy(df)
 # print('melting_season')
 # %time melting_season(df)
-# print('dry_periods')
-# %time dry_periods(df)
+# print('aridity')
+# %time aridity(df)
+# print('dry_spells')
+# %time dry_spells(df)
 # print('hydrological_signatures')
 # %time hydrological_signatures(df)
 # print('drought_indicators')
@@ -631,14 +668,16 @@ matilda_indicators = pickle_to_dict(test_dir + 'adjusted/matilda_indicators.pick
 var_name = ['max_prec_month', 'min_prec_month',
             'peak_day',
             'melt_season_start', 'melt_season_end', 'melt_season_length',
-            'dry_period_days',
+            'actual_aridity', 'potential_aridity',
+            'dry_spell_days',
             'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur',
             'clim_water_balance', 'spi1', 'spei1', 'spi3', 'spei3', 'spi6', 'spei6', 'spi12', 'spei12', 'spi24', 'spei24']
 
 title = ['Month with Maximum Precipitation', 'Month with Minimum Precipitation',
          'Timing of Peak Runoff',
          'Beginning of Melt Season', 'End of Melt Season', 'Length of Melt Season',
-         'Total Length of Dry Periods',
+         'Relative Change of Actual Aridity', 'Relative Change of Potential Aridity',
+         'Total Length of Dry Spells per year',
          'Frequency of Low-flow events', 'Mean Duration of Low-flow events',
          'Frequency of High-flow events', 'Mean Duration of High-flow events',
          'Climatic Water Balance',
@@ -650,23 +689,45 @@ title = ['Month with Maximum Precipitation', 'Month with Minimum Precipitation',
 
 unit = ['-', '-',
         'DoY',
-        'DoY', 'DoY', 'days',
-        'days',
-        'yr^-1', 'days', 'yr^-1', 'days',
+        'DoY', 'DoY', 'd',
+        '%', '%',
+        'd/a',
+        'yr^-1', 'd', 'yr^-1', 'd',
         'mm w.e.', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-']
 
 output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
 
 ## Create custom df for individual plot
 def custom_df(dic, scenario, var):
+    """
+    Custom DataFrame Construction
+    This function constructs a custom DataFrame based on the given dictionary, scenario, and variable.
+    Parameters
+    ----------
+    dic : dict
+        Dictionary containing the data for different scenarios and models.
+    scenario : str
+        Name of the selected scenario.
+    var : str
+        Name of the variable to extract from the DataFrame.
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing the selected variable from different models within the specified scenario.
+    Raises
+    ------
+    ValueError
+        If the provided variable is not one of the function outputs.
+    """
 
     out_cols = ['max_prec_month', 'min_prec_month',
                 'peak_day',
                 'melt_season_start', 'melt_season_end', 'melt_season_length',
-                'dry_period_days',
+                'actual_aridity', 'potential_aridity',
+                'dry_spell_days',
                 'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur',
-                 'clim_water_balance', 'spi1', 'spei1', 'spi3', 'spei3',
-                 'spi6', 'spei6', 'spi12', 'spei12', 'spi24', 'spei24']
+                'clim_water_balance', 'spi1', 'spei1', 'spi3', 'spei3',
+                'spi6', 'spei6', 'spi12', 'spei12', 'spi24', 'spei24']
 
     if var not in out_cols:
         raise ValueError("var needs to be one of the following strings: " +
@@ -822,7 +883,7 @@ def plot_wit_ci(var, dic, show=False):
     return fig
 
 
-plot_wit_ci('qlf_freq', matilda_indicators, show=True)
+# plot_wit_ci('qlf_freq', matilda_indicators, show=True)
 
 
 
