@@ -663,47 +663,73 @@ def calculate_indicators(dic, **kwargs):
 matilda_indicators = pickle_to_dict(test_dir + 'adjusted/matilda_indicators.pickle')
 
 ## Store variable names and respective plot labels
-var_name = ['max_prec_month', 'min_prec_month',
-            'peak_day',
-            'melt_season_start', 'melt_season_end', 'melt_season_length',
-            'actual_aridity', 'potential_aridity',
-            'dry_spell_days',
-            'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur',
-            'clim_water_balance', 'spi1', 'spei1', 'spi3', 'spei3', 'spi6', 'spei6', 'spi12', 'spei12', 'spi24', 'spei24']
+# var_name = ['max_prec_month', 'min_prec_month',
+#             'peak_day',
+#             'melt_season_start', 'melt_season_end', 'melt_season_length',
+#             'actual_aridity', 'potential_aridity',
+#             'dry_spell_days',
+#             'qlf_freq', 'qlf_dur', 'qhf_freq', 'qhf_dur',
+#             'clim_water_balance', 'spi1', 'spei1', 'spi3', 'spei3', 'spi6', 'spei6', 'spi12', 'spei12', 'spi24', 'spei24']
+#
+# title = ['Month with Maximum Precipitation', 'Month with Minimum Precipitation',
+#          'Timing of Peak Runoff',
+#          'Beginning of Melting Season', 'End of Melting Season', 'Length of Melting Season',
+#          'Relative Change of Actual Aridity', 'Relative Change of Potential Aridity',
+#          'Total Length of Dry Spells per year',
+#          'Frequency of Low-flow events', 'Mean Duration of Low-flow events',
+#          'Frequency of High-flow events', 'Mean Duration of High-flow events',
+#          'Climatic Water Balance',
+#          'Standardized Precipitation Index (1 month)', 'Standardized Precipitation Evaporation Index (1 month)',
+#          'Standardized Precipitation Index (3 months)', 'Standardized Precipitation Evaporation Index (3 months)',
+#          'Standardized Precipitation Index (6 months)', 'Standardized Precipitation Evaporation Index (6 months)',
+#          'Standardized Precipitation Index (12 months)', 'Standardized Precipitation Evaporation Index (12 months)',
+#          'Standardized Precipitation Index (24 months)', 'Standardized Precipitation Evaporation Index (24 months)']
+#
+# unit = ['-', '-',
+#         'DoY',
+#         'DoY', 'DoY', 'd',
+#         '%', '%',
+#         'd/a',
+#         'yr^-1', 'd', 'yr^-1', 'd',
+#         'mm w.e.', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-']
+#
+# output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
 
-title = ['Month with Maximum Precipitation', 'Month with Minimum Precipitation',
-         'Timing of Peak Runoff',
-         'Beginning of Melting Season', 'End of Melting Season', 'Length of Melting Season',
-         'Relative Change of Actual Aridity', 'Relative Change of Potential Aridity',
-         'Total Length of Dry Spells per year',
-         'Frequency of Low-flow events', 'Mean Duration of Low-flow events',
-         'Frequency of High-flow events', 'Mean Duration of High-flow events',
-         'Climatic Water Balance',
-         'Standardized Precipitation Index (1 month)', 'Standardized Precipitation Evaporation Index (1 month)',
-         'Standardized Precipitation Index (3 months)', 'Standardized Precipitation Evaporation Index (3 months)',
-         'Standardized Precipitation Index (6 months)', 'Standardized Precipitation Evaporation Index (6 months)',
-         'Standardized Precipitation Index (12 months)', 'Standardized Precipitation Evaporation Index (12 months)',
-         'Standardized Precipitation Index (24 months)', 'Standardized Precipitation Evaporation Index (24 months)']
+output_vars = {'max_prec_month': ('Month with Maximum Precipitation', '-'),
+ 'min_prec_month': ('Month with Minimum Precipitation', '-'),
+ 'peak_day': ('Timing of Peak Runoff', 'DoY'),
+ 'melt_season_start': ('Beginning of Melting Season', 'DoY'),
+ 'melt_season_end': ('End of Melting Season', 'DoY'),
+ 'melt_season_length': ('Length of Melting Season', 'd'),
+ 'actual_aridity': ('Relative Change of Actual Aridity', '%'),
+ 'potential_aridity': ('Relative Change of Potential Aridity', '%'),
+ 'dry_spell_days': ('Total Length of Dry Spells per year', 'd/a'),
+ 'qlf_freq': ('Frequency of Low-flow events', 'yr^-1'),
+ 'qlf_dur': ('Mean Duration of Low-flow events', 'd'),
+ 'qhf_freq': ('Frequency of High-flow events', 'yr^-1'),
+ 'qhf_dur': ('Mean Duration of High-flow events', 'd'),
+ 'clim_water_balance': ('Climatic Water Balance', 'mm w.e.'),
+ 'spi1': ('Standardized Precipitation Index (1 month)', '-'),
+ 'spei1': ('Standardized Precipitation Evaporation Index (1 month)', '-'),
+ 'spi3': ('Standardized Precipitation Index (3 months)', '-'),
+ 'spei3': ('Standardized Precipitation Evaporation Index (3 months)', '-'),
+ 'spi6': ('Standardized Precipitation Index (6 months)', '-'),
+ 'spei6': ('Standardized Precipitation Evaporation Index (6 months)', '-'),
+ 'spi12': ('Standardized Precipitation Index (12 months)', '-'),
+ 'spei12': ('Standardized Precipitation Evaporation Index (12 months)', '-'),
+ 'spi24': ('Standardized Precipitation Index (24 months)', '-'),
+ 'spei24': ('Standardized Precipitation Evaporation Index (24 months)', '-')}
 
-unit = ['-', '-',
-        'DoY',
-        'DoY', 'DoY', 'd',
-        '%', '%',
-        'd/a',
-        'yr^-1', 'd', 'yr^-1', 'd',
-        'mm w.e.', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-']
-
-output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
 
 ## Create custom df for individual plot
-def custom_df(dic, scenario, var):
+def custom_df_indicators(dic, scenario, var):
     """
-    Custom DataFrame Construction
-    This function constructs a custom DataFrame based on the given dictionary, scenario, and variable.
+    Takes a dictionary of climate change indicators and returns a combined dataframe of a specific variable for
+    a given scenario.
     Parameters
     ----------
     dic : dict
-        Dictionary containing the data for different scenarios and models.
+        Dictionary containing the outputs of calculate_indicators() for different scenarios and models.
     scenario : str
         Name of the selected scenario.
     var : str
@@ -773,7 +799,7 @@ def confidence_interval(df):
     df_ci = pd.DataFrame({'mean': mean, 'ci_lower': ci_lower, 'ci_upper': ci_upper})
     return df_ci
 
-def plot_wit_ci(var, dic, plot_type='line', show=False):
+def plot_ci_indicators(var, dic, plot_type='line', show=False):
     """
     A function to plot multi-model mean and confidence intervals of a given variable for two different scenarios.
     Parameters:
@@ -796,10 +822,10 @@ def plot_wit_ci(var, dic, plot_type='line', show=False):
         var = 'total_runoff'       # Default if nothing selected
 
     # SSP2
-    df1 = custom_df(dic, scenario='SSP2', var=var)
+    df1 = custom_df_indicators(dic, scenario='SSP2', var=var)
     df1_ci = confidence_interval(df1)
     # SSP5
-    df2 = custom_df(dic, scenario='SSP5', var=var)
+    df2 = custom_df_indicators(dic, scenario='SSP5', var=var)
     df2_ci = confidence_interval(df2)
 
     if plot_type == 'line':
@@ -917,62 +943,6 @@ def plot_wit_ci(var, dic, plot_type='line', show=False):
 
 
 ##
-
-# import dash
-# from dash import dcc
-# from dash import html
-# from dash.dependencies import Input, Output
-# import plotly.io as pio
-#
-# pio.renderers.default = "browser"
-# app = dash.Dash()
-#
-# # Create the initial line plot
-# fig = plot_wit_ci('melt_season_length', matilda_indicators)
-#
-# # Create the callback function
-# @app.callback(
-#     Output('line-plot', 'figure'),
-#     Input('arg-dropdown', 'value'),
-#     Input('type-dropdown', 'value'))
-# def update_figure(selected_arg, selected_type):
-#     return plot_wit_ci(selected_arg, matilda_indicators, selected_type)
-#
-# # Define the dropdown menu for variable
-# arg_dropdown = dcc.Dropdown(
-#     id='arg-dropdown',
-#     options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
-#     value='melt_season_length',
-#     clearable=False,
-#     style={'width': '400px',
-#            'fontFamily': 'Arial',
-#            'fontSize': 15})
-#
-# # Define the dropdown menu for plot type
-# type_dropdown = dcc.Dropdown(
-#     id='type-dropdown',
-#     options=[{'label': lab, 'value': val} for lab, val in [('Line', 'line'), ('Bar', 'bar')]],
-#     value='line',
-#     clearable=False,
-#     style={'width': '150px'})
-#
-# # Add the dropdown menus to the layout and use CSS to place them next to each other
-# app.layout = html.Div([
-#     html.Div([
-#         html.Label("Variable:"),
-#         arg_dropdown,
-#     ], style={'display': 'inline-block', 'margin-right': '30px'}),
-#     html.Div([
-#         html.Label("Plot Type:"),
-#         type_dropdown,
-#     ], style={'display': 'inline-block'}),
-#     dcc.Graph(id='line-plot', figure=fig)])
-#
-# # Run the app
-# app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside jupyter
-
-
-##
 import dash
 from dash import dcc
 from dash import html
@@ -983,40 +953,18 @@ app = dash.Dash()
 
 # Create default variables for every figure
 default_vars = ['peak_day', 'melt_season_length', 'potential_aridity', 'spei6']
+default_types = ['line', 'line', 'line', 'bar']
 
 # Create separate callback functions for each dropdown menu and graph combination
-@app.callback(
-    Output('line-plot-0', 'figure'),
-    Input('arg-dropdown-0', 'value'),
-    Input('type-dropdown-0', 'value')
-)
-def update_figure_0(selected_arg, selected_type):
-    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
-    return fig
-@app.callback(
-    Output('line-plot-1', 'figure'),
-    Input('arg-dropdown-1', 'value'),
-    Input('type-dropdown-1', 'value')
-)
-def update_figure_1(selected_arg, selected_type):
-    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
-    return fig
-@app.callback(
-    Output('line-plot-2', 'figure'),
-    Input('arg-dropdown-2', 'value'),
-    Input('type-dropdown-2', 'value')
-)
-def update_figure_2(selected_arg, selected_type):
-    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
-    return fig
-@app.callback(
-    Output('line-plot-3', 'figure'),
-    Input('arg-dropdown-3', 'value'),
-    Input('type-dropdown-3', 'value')
-)
-def update_figure_3(selected_arg, selected_type):
-    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
-    return fig
+for i in range(4):
+    @app.callback(
+        Output(f'line-plot-{i}', 'figure'),
+        Input(f'arg-dropdown-{i}', 'value'),
+        Input(f'type-dropdown-{i}', 'value')
+    )
+    def update_figure(selected_arg, selected_type, i=i):
+        fig = plot_ci_indicators(selected_arg, matilda_indicators, selected_type)
+        return fig
 
 # Define the dropdown menus and figures
 dropdowns_and_figures = []
@@ -1031,7 +979,7 @@ for i in range(4):
     type_dropdown = dcc.Dropdown(
         id=f'type-dropdown-{i}',
         options=[{'label': lab, 'value': val} for lab, val in [('Line', 'line'), ('Bar', 'bar')]],
-        value='line',
+        value=default_types[i],
         clearable=False,
         style={'width': '150px'}
     )
@@ -1048,9 +996,9 @@ for i in range(4):
             dcc.Graph(id=f'line-plot-{i}'),
         ])
     )
- # Combine the dropdown menus and figures into a single layout
+# Combine the dropdown menus and figures into a single layout
 app.layout = html.Div(dropdowns_and_figures)
- # Run the app
+# Run the app
 app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside Jupyter
 
 ## Long-term annual cycle of evaporation and precipitation for every decade

@@ -58,11 +58,11 @@ def parquet_to_dict(directory_path: str, pbar: bool = True) -> dict:
     return dictionary
 
 
-def custom_df(dic, scenario, var, resample_freq=None):
+def custom_df_matilda(dic, scenario, var, resample_freq=None):
     """
-    Takes a dictionary of model outputs and returns a combined dataframe of a specific variable for a given scenario.
+    Takes a dictionary of MATILDA outputs and returns a combined dataframe of a specific variable for a given scenario.
     Parameters:
-        dic (dict): A nested dictionary of model outputs.
+        dic (dict): A nested dictionary of MATILDA outputs.
                     The outer keys are scenario names and the inner keys are model names.
                     The corresponding values are dictionaries containing two keys:
                         'model_output' (DataFrame): containing model outputs for a given scenario and model
@@ -140,55 +140,92 @@ matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle
 
 ## Create dictionary with variable names, long names, and units
 
-var_name = ['avg_temp_catchment', 'avg_temp_glaciers',
-                    'evap_off_glaciers', 'prec_off_glaciers', 'prec_on_glaciers', 'rain_off_glaciers', 'snow_off_glaciers',
-                    'rain_on_glaciers', 'snow_on_glaciers', 'snowpack_off_glaciers', 'soil_moisture', 'upper_groundwater',
-                    'lower_groundwater', 'melt_off_glaciers', 'melt_on_glaciers', 'ice_melt_on_glaciers', 'snow_melt_on_glaciers',
-                    'refreezing_ice', 'refreezing_snow', 'total_refreezing', 'SMB', 'actual_evaporation', 'total_precipitation',
-                    'total_melt', 'runoff_without_glaciers', 'runoff_from_glaciers', 'total_runoff', 'glacier_area',
-                    'glacier_elev', 'smb_water_year', 'smb_scaled', 'smb_scaled_capped', 'smb_scaled_capped_cum', 'surplus']
+# var_name = ['avg_temp_catchment', 'avg_temp_glaciers',
+#                     'evap_off_glaciers', 'prec_off_glaciers', 'prec_on_glaciers', 'rain_off_glaciers', 'snow_off_glaciers',
+#                     'rain_on_glaciers', 'snow_on_glaciers', 'snowpack_off_glaciers', 'soil_moisture', 'upper_groundwater',
+#                     'lower_groundwater', 'melt_off_glaciers', 'melt_on_glaciers', 'ice_melt_on_glaciers', 'snow_melt_on_glaciers',
+#                     'refreezing_ice', 'refreezing_snow', 'total_refreezing', 'SMB', 'actual_evaporation', 'total_precipitation',
+#                     'total_melt', 'runoff_without_glaciers', 'runoff_from_glaciers', 'total_runoff', 'glacier_area',
+#                     'glacier_elev', 'smb_water_year', 'smb_scaled', 'smb_scaled_capped', 'smb_scaled_capped_cum', 'surplus']
+#
+# title = ['Mean Catchment Temperature',
+#          'Mean Temperature of Glacierized Area',
+#          'Off-glacier Evaporation',
+#          'Off-glacier Precipitation',
+#          'On-glacier Precipitation',
+#          'Off-glacier Rain',
+#          'Off-glacier Snow',
+#          'On-glacier Rain',
+#          'On-glacier Snow',
+#          'Off-glacier Snowpack',
+#          'Soil Moisture',
+#          'Upper Groundwater',
+#          'Lower Groundwater',
+#          'Off-glacier Melt',
+#          'On-glacier Melt',
+#          'On-glacier Ice Melt',
+#          'On-glacier Snow Melt',
+#          'Refreezing Ice',
+#          'Refreezing Snow',
+#          'Total Refreezing',
+#          'Glacier Surface Mass Balance',
+#          'Mean Actual Evaporation',
+#          'Mean Total Precipitation',
+#          'Total Melt',
+#          'Runoff without Glaciers',
+#          'Runoff from Glaciers',
+#          'Total Runoff',
+#          'Glacier Area',
+#          'Mean Glacier Elevation',
+#          'Surface Mass Balance of the Hydrological Year',
+#          'Area-scaled Surface Mass Balance',
+#          'Surface Mass Balance Capped at 0',
+#          'Cumulative Surface Mass Balance Capped at 0',
+#          'Cumulative Surface Mass Balance > 0']
+#
+# unit = ['°C', '°C', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.',
+#         'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.',
+#         'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'km²', 'm.a.s.l.', 'mm w.e.', 'mm w.e.',
+#         'mm w.e.', 'mm w.e.']
+#
+# output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
 
-title = ['Mean Catchment Temperature',
-         'Mean Temperature of Glacierized Area',
-         'Off-glacier Evaporation',
-         'Off-glacier Precipitation',
-         'On-glacier Precipitation',
-         'Off-glacier Rain',
-         'Off-glacier Snow',
-         'On-glacier Rain',
-         'On-glacier Snow',
-         'Off-glacier Snowpack',
-         'Soil Moisture',
-         'Upper Groundwater',
-         'Lower Groundwater',
-         'Off-glacier Melt',
-         'On-glacier Melt',
-         'On-glacier Ice Melt',
-         'On-glacier Snow Melt',
-         'Refreezing Ice',
-         'Refreezing Snow',
-         'Total Refreezing',
-         'Glacier Surface Mass Balance',
-         'Mean Actual Evaporation',
-         'Mean Total Precipitation',
-         'Total Melt',
-         'Runoff without Glaciers',
-         'Runoff from Glaciers',
-         'Total Runoff',
-         'Glacier Area',
-         'Mean Glacier Elevation',
-         'Surface Mass Balance of the Hydrological Year',
-         'Area-scaled Surface Mass Balance',
-         'Surface Mass Balance Capped at 0',
-         'Cumulative Surface Mass Balance Capped at 0',
-         'Cumulative Surface Mass Balance > 0']
+output_vars = {'avg_temp_catchment': ('Mean Catchment Temperature', '°C'),
+ 'avg_temp_glaciers': ('Mean Temperature of Glacierized Area', '°C'),
+ 'evap_off_glaciers': ('Off-glacier Evaporation', 'mm w.e.'),
+ 'prec_off_glaciers': ('Off-glacier Precipitation', 'mm w.e.'),
+ 'prec_on_glaciers': ('On-glacier Precipitation', 'mm w.e.'),
+ 'rain_off_glaciers': ('Off-glacier Rain', 'mm w.e.'),
+ 'snow_off_glaciers': ('Off-glacier Snow', 'mm w.e.'),
+ 'rain_on_glaciers': ('On-glacier Rain', 'mm w.e.'),
+ 'snow_on_glaciers': ('On-glacier Snow', 'mm w.e.'),
+ 'snowpack_off_glaciers': ('Off-glacier Snowpack', 'mm w.e.'),
+ 'soil_moisture': ('Soil Moisture', 'mm w.e.'),
+ 'upper_groundwater': ('Upper Groundwater', 'mm w.e.'),
+ 'lower_groundwater': ('Lower Groundwater', 'mm w.e.'),
+ 'melt_off_glaciers': ('Off-glacier Melt', 'mm w.e.'),
+ 'melt_on_glaciers': ('On-glacier Melt', 'mm w.e.'),
+ 'ice_melt_on_glaciers': ('On-glacier Ice Melt', 'mm w.e.'),
+ 'snow_melt_on_glaciers': ('On-glacier Snow Melt', 'mm w.e.'),
+ 'refreezing_ice': ('Refreezing Ice', 'mm w.e.'),
+ 'refreezing_snow': ('Refreezing Snow', 'mm w.e.'),
+ 'total_refreezing': ('Total Refreezing', 'mm w.e.'),
+ 'SMB': ('Glacier Surface Mass Balance', 'mm w.e.'),
+ 'actual_evaporation': ('Mean Actual Evaporation', 'mm w.e.'),
+ 'total_precipitation': ('Mean Total Precipitation', 'mm w.e.'),
+ 'total_melt': ('Total Melt', 'mm w.e.'),
+ 'runoff_without_glaciers': ('Runoff without Glaciers', 'mm w.e.'),
+ 'runoff_from_glaciers': ('Runoff from Glaciers', 'mm w.e.'),
+ 'total_runoff': ('Total Runoff', 'mm w.e.'),
+ 'glacier_area': ('Glacier Area', 'km²'),
+ 'glacier_elev': ('Mean Glacier Elevation', 'm.a.s.l.'),
+ 'smb_water_year': ('Surface Mass Balance of the Hydrological Year',
+  'mm w.e.'),
+ 'smb_scaled': ('Area-scaled Surface Mass Balance', 'mm w.e.'),
+ 'smb_scaled_capped': ('Surface Mass Balance Capped at 0', 'mm w.e.'),
+ 'smb_scaled_capped_cum': ('Cumulative Surface Mass Balance Capped at 0',
+  'mm w.e.')}
 
-unit = ['°C', '°C', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.',
-        'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.',
-        'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'km²', 'm.a.s.l.', 'mm w.e.', 'mm w.e.',
-        'mm w.e.', 'mm w.e.']
-
-output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
 
 ## Plot functions for mean with CIs
 
@@ -216,7 +253,7 @@ def confidence_interval(df):
     return df_ci
 
 
-def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
+def plot_ci_matilda(var, dic=matilda_scenarios, resample_freq='Y', show=False):
     """
     A function to plot multi-model mean and confidence intervals of a given variable for two different scenarios.
     Parameters:
@@ -239,10 +276,10 @@ def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
         var = 'total_runoff'       # Default if nothing selected
 
     # SSP2
-    df1 = custom_df(dic, scenario='SSP2', var=var, resample_freq=resample_freq)
+    df1 = custom_df_matilda(dic, scenario='SSP2', var=var, resample_freq=resample_freq)
     df1_ci = confidence_interval(df1)
     # SSP5
-    df2 = custom_df(dic, scenario='SSP5', var=var, resample_freq=resample_freq)
+    df2 = custom_df_matilda(dic, scenario='SSP5', var=var, resample_freq=resample_freq)
     df2_ci = confidence_interval(df2)
 
     fig = go.Figure([
@@ -324,60 +361,64 @@ def plot_wit_ci(var, dic=matilda_scenarios, resample_freq='Y', show=False):
     return fig
 
 
+# turn into function/class to customize scenario/resample_rate/renderer etc.
+# test in binder and add dash to requirements
+# add fastparquet to requirements
+
 ##
 import dash
 from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output
 import plotly.io as pio
-
 pio.renderers.default = "browser"
 app = dash.Dash()
 
-# Create the initial line plot
-fig = plot_wit_ci('total_runoff', resample_freq='D')
+# Create default variables for every figure
+default_vars = ['total_runoff', 'total_precipitation', 'runoff_from_glaciers', 'glacier_area']
 
-# Create the callback function
-@app.callback(
-    Output('line-plot', 'figure'),
-    Input('arg-dropdown', 'value'),
-    Input('freq-dropdown', 'value'))
-def update_figure(selected_arg, selected_freq):
-    return plot_wit_ci(selected_arg, resample_freq=selected_freq)
+# Create separate callback functions for each dropdown menu and graph combination
+for i in range(4):
+    @app.callback(
+        Output(f'line-plot-{i}', 'figure'),
+        Input(f'arg-dropdown-{i}', 'value'),
+        Input(f'freq-dropdown-{i}', 'value')
+    )
+    def update_figure(selected_arg, selected_freq, i=i):
+        fig = plot_ci_matilda(selected_arg, resample_freq=selected_freq)
+        return fig
 
-# Define the dropdown menu for variable
-arg_dropdown = dcc.Dropdown(
-    id='arg-dropdown',
-    options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
-    value='total_runoff',
-    clearable=False,
-    style={'width': '250px'})
-
-# Define the dropdown menu for resampling frequency
-freq_dropdown = dcc.Dropdown(
-    id='freq-dropdown',
-    options=[{'label': freq, 'value': freq} for freq in ['M', 'Y', '10Y']],
-    value='Y',
-    clearable=False,
-    style={'width': '100px'})
-
-# Add the dropdown menus to the layout and use CSS to place them next to each other
-app.layout = html.Div([
-    html.Div([
-        html.Label("Variable:"),
-        arg_dropdown,
-    ], style={'display': 'inline-block', 'margin-right': '30px'}),
-    html.Div([
-        html.Label("Resampling Frequency:"),
-        freq_dropdown,
-    ], style={'display': 'inline-block'}),
-    dcc.Graph(id='line-plot', figure=fig)
-])
-
-# Run the app
-app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside jupyter
-
-# turn into function/class to customize scenario/resample_rate/renderer etc.
-# test in binder and add dash to requirements
-# add fastparquet to requirements
-
+# Define the dropdown menus and figures
+dropdowns_and_figures = []
+for i in range(4):
+    arg_dropdown = dcc.Dropdown(
+        id=f'arg-dropdown-{i}',
+        options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
+        value=default_vars[i],
+        clearable=False,
+        style={'width': '400px', 'fontFamily': 'Arial', 'fontSize': 15}
+    )
+    freq_dropdown = dcc.Dropdown(
+        id=f'freq-dropdown-{i}',
+        options=[{'label': freq, 'value': freq} for freq in ['M', 'Y', '10Y']],
+        value='Y',
+        clearable=False,
+        style={'width': '100px'}
+    )
+    dropdowns_and_figures.append(
+        html.Div([
+            html.Div([
+                html.Label("Variable:"),
+                arg_dropdown,
+            ], style={'display': 'inline-block', 'margin-right': '30px'}),
+            html.Div([
+                html.Label("Frequency:"),
+                freq_dropdown,
+            ], style={'display': 'inline-block'}),
+            dcc.Graph(id=f'line-plot-{i}'),
+        ])
+    )
+ # Combine the dropdown menus and figures into a single layout
+app.layout = html.Div(dropdowns_and_figures)
+ # Run the app
+app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside Jupyter
