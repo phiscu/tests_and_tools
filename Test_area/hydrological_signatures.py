@@ -81,9 +81,7 @@ def dict_to_pickle(dic, target_path):
 
 matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')   # pickle for speed/parquet for size
 df = matilda_scenarios['SSP2']['EC-Earth3']['model_output']
-
-
-print(df.columns)
+# print(df.columns)
 
 ## Functions
 
@@ -675,7 +673,7 @@ var_name = ['max_prec_month', 'min_prec_month',
 
 title = ['Month with Maximum Precipitation', 'Month with Minimum Precipitation',
          'Timing of Peak Runoff',
-         'Beginning of Melt Season', 'End of Melt Season', 'Length of Melt Season',
+         'Beginning of Melting Season', 'End of Melting Season', 'Length of Melting Season',
          'Relative Change of Actual Aridity', 'Relative Change of Potential Aridity',
          'Total Length of Dry Spells per year',
          'Frequency of Low-flow events', 'Mean Duration of Low-flow events',
@@ -775,7 +773,7 @@ def confidence_interval(df):
     df_ci = pd.DataFrame({'mean': mean, 'ci_lower': ci_lower, 'ci_upper': ci_upper})
     return df_ci
 
-def plot_wit_ci(var, dic, show=False):
+def plot_wit_ci(var, dic, plot_type='line', show=False):
     """
     A function to plot multi-model mean and confidence intervals of a given variable for two different scenarios.
     Parameters:
@@ -784,8 +782,8 @@ def plot_wit_ci(var, dic, show=False):
         The variable to plot.
     dic: dict, optional (default=matilda_scenarios)
         A dictionary containing the scenarios as keys and the dataframes as values.
-    resample_freq: str, optional (default='Y')
-        The resampling frequency to apply to the data.
+    plot_type: str, optional (default='line')
+        Whether the plot should be a line or a bar plot.
     show: bool, optional (default=False)
         Whether to show the resulting plot or not.
     Returns:
@@ -804,7 +802,8 @@ def plot_wit_ci(var, dic, show=False):
     df2 = custom_df(dic, scenario='SSP5', var=var)
     df2_ci = confidence_interval(df2)
 
-    fig = go.Figure([
+    if plot_type == 'line':
+        fig = go.Figure([
         # SSP2
         go.Scatter(
             name='SSP2',
@@ -863,6 +862,40 @@ def plot_wit_ci(var, dic, show=False):
             showlegend=False
         )
     ])
+    elif plot_type == 'bar':
+        fig = go.Figure([
+            # SSP2
+            go.Bar(
+                name='SSP2',
+                x=df1_ci.index,
+                y=round(df1_ci['mean'], 2),
+                marker=dict(color='darkorange'),
+                error_y=dict(
+                    type='data',
+                    symmetric=False,
+                    array=round(df1_ci['mean'] - df1_ci['ci_lower'], 2),
+                    arrayminus=round(df1_ci['ci_upper'] - df1_ci['mean'], 2),
+                    color='grey'
+                )
+            ),
+            # SSP5
+            go.Bar(
+                name='SSP5',
+                x=df2_ci.index,
+                y=round(df2_ci['mean'], 2),
+                marker=dict(color='darkblue'),
+                error_y=dict(
+                    type='data',
+                    symmetric=False,
+                    array=round(df2_ci['mean'] - df2_ci['ci_lower'], 2),
+                    arrayminus=round(df2_ci['ci_upper'] - df2_ci['mean'], 2),
+                    color='grey'
+                )
+            )
+        ])
+    else:
+        raise ValueError("Invalid property specified for 'plot_type'. Choose either 'line' or 'bar'")
+
     fig.update_layout(
         xaxis_title='Year',
         yaxis_title=output_vars[var][0] + ' [' + output_vars[var][1] + ']',
@@ -883,61 +916,144 @@ def plot_wit_ci(var, dic, show=False):
     return fig
 
 
-# plot_wit_ci('qlf_freq', matilda_indicators, show=True)
+##
 
-
-
-
-# DoY to Date?
+# import dash
+# from dash import dcc
+# from dash import html
+# from dash.dependencies import Input, Output
+# import plotly.io as pio
+#
+# pio.renderers.default = "browser"
+# app = dash.Dash()
+#
+# # Create the initial line plot
+# fig = plot_wit_ci('melt_season_length', matilda_indicators)
+#
+# # Create the callback function
+# @app.callback(
+#     Output('line-plot', 'figure'),
+#     Input('arg-dropdown', 'value'),
+#     Input('type-dropdown', 'value'))
+# def update_figure(selected_arg, selected_type):
+#     return plot_wit_ci(selected_arg, matilda_indicators, selected_type)
+#
+# # Define the dropdown menu for variable
+# arg_dropdown = dcc.Dropdown(
+#     id='arg-dropdown',
+#     options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
+#     value='melt_season_length',
+#     clearable=False,
+#     style={'width': '400px',
+#            'fontFamily': 'Arial',
+#            'fontSize': 15})
+#
+# # Define the dropdown menu for plot type
+# type_dropdown = dcc.Dropdown(
+#     id='type-dropdown',
+#     options=[{'label': lab, 'value': val} for lab, val in [('Line', 'line'), ('Bar', 'bar')]],
+#     value='line',
+#     clearable=False,
+#     style={'width': '150px'})
+#
+# # Add the dropdown menus to the layout and use CSS to place them next to each other
+# app.layout = html.Div([
+#     html.Div([
+#         html.Label("Variable:"),
+#         arg_dropdown,
+#     ], style={'display': 'inline-block', 'margin-right': '30px'}),
+#     html.Div([
+#         html.Label("Plot Type:"),
+#         type_dropdown,
+#     ], style={'display': 'inline-block'}),
+#     dcc.Graph(id='line-plot', figure=fig)])
+#
+# # Run the app
+# app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside jupyter
 
 
 ##
-
 import dash
 from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output
 import plotly.io as pio
-
 pio.renderers.default = "browser"
 app = dash.Dash()
 
-# Create the initial line plot
-fig = plot_wit_ci('melt_season_length', matilda_indicators)
+# Create default variables for every figure
+default_vars = ['peak_day', 'melt_season_length', 'potential_aridity', 'spei6']
 
-# Create the callback function
+# Create separate callback functions for each dropdown menu and graph combination
 @app.callback(
-    Output('line-plot', 'figure'),
-    Input('arg-dropdown', 'value'))
-def update_figure(selected_arg):
-    return plot_wit_ci(selected_arg, matilda_indicators)
+    Output('line-plot-0', 'figure'),
+    Input('arg-dropdown-0', 'value'),
+    Input('type-dropdown-0', 'value')
+)
+def update_figure_0(selected_arg, selected_type):
+    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
+    return fig
+@app.callback(
+    Output('line-plot-1', 'figure'),
+    Input('arg-dropdown-1', 'value'),
+    Input('type-dropdown-1', 'value')
+)
+def update_figure_1(selected_arg, selected_type):
+    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
+    return fig
+@app.callback(
+    Output('line-plot-2', 'figure'),
+    Input('arg-dropdown-2', 'value'),
+    Input('type-dropdown-2', 'value')
+)
+def update_figure_2(selected_arg, selected_type):
+    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
+    return fig
+@app.callback(
+    Output('line-plot-3', 'figure'),
+    Input('arg-dropdown-3', 'value'),
+    Input('type-dropdown-3', 'value')
+)
+def update_figure_3(selected_arg, selected_type):
+    fig = plot_wit_ci(selected_arg, matilda_indicators, selected_type)
+    return fig
 
-# Define the dropdown menu for variable
-arg_dropdown = dcc.Dropdown(
-    id='arg-dropdown',
-    options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
-    value='melt_season_length',
-    clearable=False,
-    style={'width': '250px'})
-
-# Add the dropdown menus to the layout and use CSS to place them next to each other
-app.layout = html.Div([
-    html.Div([
-        html.Label("Variable:"),
-        arg_dropdown,
-    ], style={'display': 'inline-block', 'margin-right': '30px'}),
-    dcc.Graph(id='line-plot', figure=fig)
-])
-
-# Run the app
-app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside jupyter
-
-
-
+# Define the dropdown menus and figures
+dropdowns_and_figures = []
+for i in range(4):
+    arg_dropdown = dcc.Dropdown(
+        id=f'arg-dropdown-{i}',
+        options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
+        value=default_vars[i],
+        clearable=False,
+        style={'width': '400px', 'fontFamily': 'Arial', 'fontSize': 15}
+    )
+    type_dropdown = dcc.Dropdown(
+        id=f'type-dropdown-{i}',
+        options=[{'label': lab, 'value': val} for lab, val in [('Line', 'line'), ('Bar', 'bar')]],
+        value='line',
+        clearable=False,
+        style={'width': '150px'}
+    )
+    dropdowns_and_figures.append(
+        html.Div([
+            html.Div([
+                html.Label("Variable:"),
+                arg_dropdown,
+            ], style={'display': 'inline-block', 'margin-right': '30px'}),
+            html.Div([
+                html.Label("Plot Type:"),
+                type_dropdown,
+            ], style={'display': 'inline-block'}),
+            dcc.Graph(id=f'line-plot-{i}'),
+        ])
+    )
+ # Combine the dropdown menus and figures into a single layout
+app.layout = html.Div(dropdowns_and_figures)
+ # Run the app
+app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside Jupyter
 
 ## Long-term annual cycle of evaporation and precipitation for every decade
-
-
 
 # Compute the rolling mean of evaporation and precipitation
 # df_avg = df[['prec_off_glaciers', 'evap_off_glaciers']].rolling(window=30).mean()
