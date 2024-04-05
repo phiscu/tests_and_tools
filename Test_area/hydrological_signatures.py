@@ -693,9 +693,9 @@ matilda_indicators = pickle_to_dict(test_dir + 'adjusted/matilda_indicators.pick
 #         'yr^-1', 'd', 'yr^-1', 'd',
 #         'mm w.e.', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-']
 #
-# output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
+# indicator_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
 
-output_vars = {'max_prec_month': ('Month with Maximum Precipitation', '-'),
+indicator_vars = {'max_prec_month': ('Month with Maximum Precipitation', '-'),
  'min_prec_month': ('Month with Minimum Precipitation', '-'),
  'peak_day': ('Timing of Peak Runoff', 'DoY'),
  'melt_season_start': ('Beginning of Melting Season', 'DoY'),
@@ -924,8 +924,8 @@ def plot_ci_indicators(var, dic, plot_type='line', show=False):
 
     fig.update_layout(
         xaxis_title='Year',
-        yaxis_title=output_vars[var][0] + ' [' + output_vars[var][1] + ']',
-        title={'text': '<b>' + output_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
+        yaxis_title=indicator_vars[var][0] + ' [' + indicator_vars[var][1] + ']',
+        title={'text': '<b>' + indicator_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
         legend={'font': {'size': 18, 'family': 'Arial'}},
         hovermode='x',
         plot_bgcolor='rgba(255, 255, 255, 1)',  # Set the background color to white
@@ -938,8 +938,8 @@ def plot_ci_indicators(var, dic, plot_type='line', show=False):
     # show figure
     if show:
         fig.show()
-
-    return fig
+    else:
+        return fig
 
 
 ##
@@ -952,11 +952,14 @@ pio.renderers.default = "browser"
 app = dash.Dash()
 
 # Create default variables for every figure
-default_vars = ['peak_day', 'melt_season_length', 'potential_aridity', 'spei6']
+default_vars = ['peak_day', 'melt_season_length', 'potential_aridity', 'spei12']
 default_types = ['line', 'line', 'line', 'bar']
 
+default_vars = ['melt_season_length', 'potential_aridity', 'spei12']
+default_types = ['line', 'line', 'bar']
+
 # Create separate callback functions for each dropdown menu and graph combination
-for i in range(4):
+for i in range(3):
     @app.callback(
         Output(f'line-plot-{i}', 'figure'),
         Input(f'arg-dropdown-{i}', 'value'),
@@ -968,10 +971,10 @@ for i in range(4):
 
 # Define the dropdown menus and figures
 dropdowns_and_figures = []
-for i in range(4):
+for i in range(3):
     arg_dropdown = dcc.Dropdown(
         id=f'arg-dropdown-{i}',
-        options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
+        options=[{'label': indicator_vars[var][0], 'value': var} for var in indicator_vars.keys()],
         value=default_vars[i],
         clearable=False,
         style={'width': '400px', 'fontFamily': 'Arial', 'fontSize': 15}
@@ -1146,8 +1149,8 @@ app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside Jupyt
 #     margin=dict(l=10, r=10, t=90, b=10),  # Adjust the margins to remove space around the plot
 #     plot_bgcolor='white',  # set the background color of the plot to white
 #     xaxis_title='Month',
-#     yaxis_title=output_vars[var][0] + ' [' + output_vars[var][1] + ']',
-#     title={'text': '<b>' + output_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
+#     yaxis_title=indicator_vars[var][0] + ' [' + indicator_vars[var][1] + ']',
+#     title={'text': '<b>' + indicator_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
 #     legend={'font': {'size': 18, 'family': 'Arial'}},
 #
 #

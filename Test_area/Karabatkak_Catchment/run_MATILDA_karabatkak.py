@@ -11,7 +11,9 @@ import spotpy
 import numpy as np
 import socket
 import matplotlib as mpl
-from MATILDA_slim import MATILDA
+#from MATILDA_slim import MATILDA
+from matilda.core import matilda_simulation, matilda_parameter, matilda_preproc, matilda_plots, matilda_submodules, matilda_save_output
+from matilda.mspot_glacier import psample, spot_setup, loglike_kge
 
 mpl.use('Agg')
 
@@ -24,8 +26,8 @@ else:
     home = str(Path.home()) + '/Seafile'
 sys.path.append(home + '/Ana-Lena_Phillip/data/scripts/MATILDA_package_slim')
 sys.path.append(home + '/Ana-Lena_Phillip/data/scripts/Test_area')
-import mspot_cirrus
-import mspot
+# import mspot_cirrus
+# import mspot
 
 ## Setting file paths and parameters
 working_directory = home + "/Ana-Lena_Phillip/data/"
@@ -37,10 +39,20 @@ output_path = working_directory + "input_output/output/" + data_csv[4:21]
 output_path = "/home/ana/Desktop/Meeting/kashkator_"
 
 
-df = pd.read_csv(input_path + data_csv)
-obs = pd.read_csv(input_path + runoff_obs)
+df = pd.read_csv('/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/output/ERA5L.csv')
+obs = pd.read_csv('/home/phillip/Seafile/EBA-CA/Repositories/matilda_edu/input/obs_runoff_example.csv')
 # obs["Qobs"] = obs["Qobs"] / 86400*(46.232*1000000)/1000
 
+# Remove the first column
+df = df.iloc[:, 1:]
+
+# Convert the second column to datetime and rename it to 'TIMESTAMP'
+df['TIMESTAMP'] = pd.to_datetime(df['dt'])
+df = df.drop(df.columns[0], axis=1)
+# Remove the third column
+df = df.drop(df.columns[0], axis=1)
+# Rename the fourth column from 'temp_c' to 'T2' and the fifth column from 'prec' to 'RRR'
+df = df.rename(columns={'temp_c': 'T2', 'prec': 'RRR'})
 
 # set_up_start='2017-01-01 00:00:00'
 # set_up_end='2018-12-31 23:00:00'
@@ -151,21 +163,37 @@ best_par_karab.to_csv(working_directory + 'scripts/Test_area/Karabatkak_Catchmen
 #                                       area_cat=7.53, area_glac=2.95,
 #                                       ele_dat=2550, ele_glac=3957, ele_cat=3830, **best_summary['best_param'])
 # ## Running MATILDA
-parameter = MATILDA.MATILDA_parameter(df, set_up_start='2016-01-01 00:00:00', set_up_end='2016-12-31 23:00:00',
-                                      sim_start='2017-01-01 00:00:00', sim_end='2018-12-31 23:00:00', freq="D",
-                                      area_cat=7.53, area_glac=2.95,
-                                      ele_dat=2550, ele_glac=3957, lr_temp=-0.005936, lr_prec=-0.0002503,
+parameter = matilda_parameter(df, set_up_start='1998-01-01 00:00:00', set_up_end='1999-12-31 23:00:00',
+                                      sim_start='2000-01-01 00:00:00', sim_end='2020-12-31 23:00:00', freq="D",
+                                      area_cat=7.53, area_glac=2.95, lat= 42.18280043250193,
+                                      ele_dat=2550, ele_glac=3957, lr_temp=-0.008, lr_prec=-0.0002503,
                                       TT_snow=0.354, TT_rain=0.5815, CFMAX_snow=4.824, CFMAX_ice=5.574, CFR_snow=0.08765,
                                       CFR_ice=0.01132, BETA=2.03, CET=0.0471, FC=462.5, K0=0.03467, K1=0.0544, K2=0.1277,
                                       LP=0.4917, MAXBAS=2.494, PERC=1.723, UZL=413.0, PCORR=1.19, SFCF=0.874, CWH=0.011765)
-df_preproc, obs_preproc = MATILDA.MATILDA_preproc(df, parameter, obs=obs)  # Data preprocessing
+df_preproc, obs_preproc = matilda_preproc(df, parameter, obs=obs)  # Data preprocessing
 #
-output_MATILDA = MATILDA.MATILDA_submodules(df_preproc, parameter, obs_preproc)  # MATILDA model run + downscaling
+output_MATILDA = matilda_submodules(df_preproc, parameter, obs_preproc)  # MATILDA model run + downscaling
 #
-output_MATILDA = MATILDA.MATILDA_plots(output_MATILDA, parameter)
+# output_MATILDA = matilda_plots(output_MATILDA, parameter)
 # # Creating plot for the input (meteorological) data (fig1), MATILDA runoff simulation (fig2) and HBV variables (fig3) and
 # # adding them to the output
-#
+
+pdd_data = pd.DataFrame()
+pdd_data['temp'] = output_MATILDA[0].avg_temp_glaciers
+
+# Set the base temperature
+base_temperature = 0
+
+# Calculate daily degree days
+pdd_data['degree_days'] = pdd_data['temp'] - base_temperature
+pdd_data['degree_days'] = pdd_data['degree_days'].apply(lambda x: x if x > 0 else 0)
+
+# Calculate annual positive degree day sum
+annual_degree_days = pdd_data.groupby(pdd_data.index.year)['degree_days'].sum()
+
+print(annual_degree_days)
+
+
 MATILDA.MATILDA_save_output(output_MATILDA, parameter, output_path)
 #
 # ## This function is a standalone function to run the whole MATILDA simulation
@@ -180,3 +208,41 @@ MATILDA.MATILDA_save_output(output_MATILDA, parameter, output_path)
 # output_MATILDA[0].Q_Total
 #
 # ##
+
+##
+glacier_profile_karab = pd.read_csv('/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/glacier_profile_karabatkak_farinotti_marie.csv')
+settings = {
+    'input_df': df,
+    'obs': obs,
+    'set_up_start': '1979-01-01 00:00:00',
+    'set_up_end': '1981-12-31 23:00:00',
+    'sim_start': '1982-01-01 00:00:00',
+    'sim_end': '2021-12-31 23:00:00',
+    'freq': "D",
+    'area_cat': 2.046,
+    'area_glac': 2.046,
+    'lat': 42.33,
+    'glacier_profile': glacier_profile_karab,
+    'elev_rescaling': True,
+    'ele_cat': None,
+    'ele_glac': 3830,
+    'ele_dat': 3335.67
+}
+output5 = matilda_simulation(lr_temp=-0.005, **settings)
+output6 = matilda_simulation(lr_temp=-0.006, **settings)
+output7 = matilda_simulation(lr_temp=-0.007, **settings)
+output8 = matilda_simulation(lr_temp=-0.008, **settings)
+
+pdd_data = pd.DataFrame()
+pdd_data['temp'] = output5[0].avg_temp_glaciers
+
+# Set the base temperature
+base_temperature = 0
+
+# Calculate daily degree days
+pdd_data['degree_days'] = pdd_data['temp'] - base_temperature
+pdd_data['degree_days'] = pdd_data['degree_days'].apply(lambda x: x if x > 0 else 0)
+
+
+# pdds = pd.DataFrame()
+pdds['pdd5'] = pdd_data.groupby(pdd_data.index.year)['degree_days'].sum()

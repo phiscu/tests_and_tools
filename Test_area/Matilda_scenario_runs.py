@@ -6,7 +6,7 @@ from pathlib import Path
 from matilda.core import matilda_simulation
 
 home = str(Path.home()) + '/Seafile'
-sys.path.append(home + '/Ana-Lena_Phillip/data/tests_and_tools')
+# sys.path.append(home + '/Ana-Lena_Phillip/data/tests_and_tools')
 wd = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data'
 glacier_profile = pd.read_csv(wd + "/kyzulsuu_glacier_profile.csv")
 
@@ -142,10 +142,58 @@ param_dict = {
          'RFS': 0.21825151
 }
 
+## Param descriptions:
+
+# matilda_settings = {
+#     "set_up_start": '1979-01-01',  # Start date of the setup period
+#     "set_up_end": '1980-12-31',  # End date of the setup period
+#     "sim_start": '1981-01-01',  # Start date of the simulation period
+#     "sim_end": '2100-12-31',  # End date of the simulation period
+#     "freq": "M",  # Frequency of the data (monthly)
+#     "glacier_profile": glacier_profile,  # Glacier profile
+#     "area_cat": 295.763,  # Area of the catchment
+#     "lat": 42.33,  # Latitude of the catchment
+#     "warn": False,  # Warning flag
+#     "plot_type": "all",  # Type of plot
+#     "plots": False,  # Flag to indicate if plots should be generated
+#     "elev_rescaling": True,  # Flag to indicate if elevation rescaling should be done
+#     "ele_dat": 3172,  # Elevation of the data
+#     "ele_cat": 3295,  # Elevation of the catchment
+#     "area_glac": 32.51,  # Area of the glacier
+#     "ele_glac": 4068,  # Elevation of the glacier
+#     "pfilter": 0  # Filter parameter
+# }
+# param_dict = {
+#     'lr_temp': -0.006077369,  # Lapse rate for temperature
+#     'lr_prec': 0.0013269137,  # Lapse rate for precipitation
+#     'BETA': 5.654754,
+#     'CET': 0.08080378,
+#     'FC': 365.68375,  # Field capacity
+#     'K0': 0.36890236,  # K0 parameter
+#     'K1': 0.022955153,  # K1 parameter
+#     'K2': 0.060069658,  # K2 parameter
+#     'LP': 0.63395154,  # LP parameter
+#     'MAXBAS': 5.094901,  # Maximum basin storage
+#     'PERC': 0.39491335,  # Percolation
+#     'UZL': 348.0978,  # Upper zone limit
+#     'PCORR': 1.0702422,  # Precipitation correction
+#     'TT_snow': -1.1521467,  # Temperature threshold for snow
+#     'TT_diff': 1.5895765,  # Temperature difference
+#     'CFMAX_ice': 3.6518102,  # Maximum ice content
+#     'CFMAX_rel': 1.8089349,  # Maximum relative content
+#     'SFCF': 0.42293832,  # Soil field capacity
+#     'CWH': 0.11234668,  # Crop water holding capacity
+#     'AG': 0.9618855,
+#     'RFS': 0.11432563  # Rainfall sensitivity ???
+# }
+
 ## Read adjusted CMIP6 data
 
 tas = pickle_to_dict(test_dir + 'adjusted/tas.pickle')
 pr = pickle_to_dict(test_dir + 'adjusted/pr.pickle')
+
+tas_dict = pickle_to_dict(test_dir + 'adjusted/ssp_tas_dict.pickle')
+pr_dict = pickle_to_dict(test_dir + 'adjusted/ssp_pr_dict.pickle')
 
 ## Create MATILDA input
 
@@ -319,13 +367,13 @@ class MatildaBulkProcessor:
 
 
 # Usage
-# matilda_bulk = MatildaBulkProcessor(scenarios, matilda_settings, param_dict)
-# matilda_scenarios = matilda_bulk.run_single_process()
+matilda_bulk = MatildaBulkProcessor(scenarios, matilda_settings, param_dict)
+matilda_scenarios = matilda_bulk.run_single_process()
 # matilda_scenarios = matilda_bulk.run_multi_process()
 
 # dict_to_pickle(matilda_scenarios, test_dir + 'adjusted/matilda_scenarios.pickle')
 
-matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
+# matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle')
 
 
 ## Store results in parquet files to limit storage costs

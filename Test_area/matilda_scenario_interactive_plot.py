@@ -188,9 +188,9 @@ matilda_scenarios = pickle_to_dict(test_dir + 'adjusted/matilda_scenarios.pickle
 #         'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'mm w.e.', 'km²', 'm.a.s.l.', 'mm w.e.', 'mm w.e.',
 #         'mm w.e.', 'mm w.e.']
 #
-# output_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
+# matilda_vars = {key: (val1, val2) for key, val1, val2 in zip(var_name, title, unit)}
 
-output_vars = {'avg_temp_catchment': ('Mean Catchment Temperature', '°C'),
+matilda_vars = {'avg_temp_catchment': ('Mean Catchment Temperature', '°C'),
  'avg_temp_glaciers': ('Mean Temperature of Glacierized Area', '°C'),
  'evap_off_glaciers': ('Off-glacier Evaporation', 'mm w.e.'),
  'prec_off_glaciers': ('Off-glacier Precipitation', 'mm w.e.'),
@@ -224,9 +224,9 @@ output_vars = {'avg_temp_catchment': ('Mean Catchment Temperature', '°C'),
  'smb_scaled': ('Area-scaled Surface Mass Balance', 'mm w.e.'),
  'smb_scaled_capped': ('Surface Mass Balance Capped at 0', 'mm w.e.'),
  'smb_scaled_capped_cum': ('Cumulative Surface Mass Balance Capped at 0',
-  'mm w.e.')}
+ 'mm w.e.')}
 
-
+list(matilda_vars.keys())
 ## Plot functions for mean with CIs
 
 import plotly.graph_objects as go
@@ -343,8 +343,8 @@ def plot_ci_matilda(var, dic=matilda_scenarios, resample_freq='Y', show=False):
     ])
     fig.update_layout(
         xaxis_title='Year',
-        yaxis_title=output_vars[var][0] + ' [' + output_vars[var][1] + ']',
-        title={'text': '<b>' + output_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
+        yaxis_title=matilda_vars[var][0] + ' [' + matilda_vars[var][1] + ']',
+        title={'text': '<b>' + matilda_vars[var][0] + '</b>', 'font': {'size': 28, 'color': 'darkblue', 'family': 'Arial'}},
         legend={'font': {'size': 18, 'family': 'Arial'}},
         hovermode='x',
         plot_bgcolor='rgba(255, 255, 255, 1)',  # Set the background color to white
@@ -357,68 +357,150 @@ def plot_ci_matilda(var, dic=matilda_scenarios, resample_freq='Y', show=False):
     # show figure
     if show:
         fig.show()
-
-    return fig
+    else:
+        return fig
 
 
 # turn into function/class to customize scenario/resample_rate/renderer etc.
 # test in binder and add dash to requirements
 # add fastparquet to requirements
 
-##
+# ##
+# import dash
+# # from dash import dcc
+# # from dash import html
+# # from dash.dependencies import dash.dependencies.Input, dash.dependencies.Output
+# import plotly.io as pio
+# pio.renderers.default = "browser"
+# app = dash.Dash()
+#
+# # Create default variables for every figure
+# default_vars = ['total_runoff', 'total_precipitation', 'runoff_from_glaciers', 'glacier_area']
+#
+# # Create separate callback functions for each dropdown menu and graph combination
+# for i in range(4):
+#     @app.callback(
+#         dash.dependencies.Output(f'line-plot-{i}', 'figure'),
+#         dash.dependencies.Input(f'arg-dropdown-{i}', 'value'),
+#         dash.dependencies.Input(f'freq-dropdown-{i}', 'value')
+#     )
+#     def update_figure(selected_arg, selected_freq, i=i):
+#         fig = plot_ci_matilda(selected_arg, resample_freq=selected_freq)
+#         return fig
+#
+# # Define the dropdown menus and figures
+# dropdowns_and_figures = []
+# for i in range(4):
+#     arg_dropdown = dash.dcc.Dropdown(
+#         id=f'arg-dropdown-{i}',
+#         options=[{'label': matilda_vars[var][0], 'value': var} for var in matilda_vars.keys()],
+#         value=default_vars[i],
+#         clearable=False,
+#         style={'width': '400px', 'fontFamily': 'Arial', 'fontSize': 15}
+#     )
+#     freq_dropdown = dash.dcc.Dropdown(
+#         id=f'freq-dropdown-{i}',
+#         options=[{'label': freq, 'value': freq} for freq in ['M', 'Y', '10Y']],
+#         value='Y',
+#         clearable=False,
+#         style={'width': '100px'}
+#     )
+#     dropdowns_and_figures.append(
+#         dash.html.Div([
+#             dash.html.Div([
+#                 dash.html.Label("Variable:"),
+#                 arg_dropdown,
+#             ], style={'display': 'inline-block', 'margin-right': '30px'}),
+#             dash.html.Div([
+#                 dash.html.Label("Frequency:"),
+#                 freq_dropdown,
+#             ], style={'display': 'inline-block'}),
+#             dash.dcc.Graph(id=f'line-plot-{i}'),
+#         ])
+#     )
+#  # Combine the dropdown menus and figures into a single layout
+# app.layout = dash.html.Div(dropdowns_and_figures)
+#  # Run the app
+# app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside Jupyter
+
+## for jupyter lab
+
 import dash
-from dash import dcc
-from dash import html
-from dash.dependencies import Input, Output
+from jupyter_dash import JupyterDash
 import plotly.io as pio
+
 pio.renderers.default = "browser"
-app = dash.Dash()
+JupyterDash.infer_jupyter_proxy_config()
+# app = dash.Dash()
+app = JupyterDash(__name__)
+server = app.server
 
-# Create default variables for every figure
-default_vars = ['total_runoff', 'total_precipitation', 'runoff_from_glaciers', 'glacier_area']
 
-# Create separate callback functions for each dropdown menu and graph combination
-for i in range(4):
-    @app.callback(
-        Output(f'line-plot-{i}', 'figure'),
-        Input(f'arg-dropdown-{i}', 'value'),
-        Input(f'freq-dropdown-{i}', 'value')
-    )
-    def update_figure(selected_arg, selected_freq, i=i):
-        fig = plot_ci_matilda(selected_arg, resample_freq=selected_freq)
-        return fig
+def matilda_dash(fig_count=4,
+                 default_vars=['total_runoff', 'total_precipitation', 'glacier_area', 'runoff_from_glaciers'],
+                 display_mode='inLine'):
+    # If number of default variables does not match the number of figures use variables in default order
+    if fig_count != len(default_vars):
+        default_vars = list(matilda_vars.keys())
 
-# Define the dropdown menus and figures
-dropdowns_and_figures = []
-for i in range(4):
-    arg_dropdown = dcc.Dropdown(
-        id=f'arg-dropdown-{i}',
-        options=[{'label': output_vars[var][0], 'value': var} for var in output_vars.keys()],
-        value=default_vars[i],
-        clearable=False,
-        style={'width': '400px', 'fontFamily': 'Arial', 'fontSize': 15}
-    )
-    freq_dropdown = dcc.Dropdown(
-        id=f'freq-dropdown-{i}',
-        options=[{'label': freq, 'value': freq} for freq in ['M', 'Y', '10Y']],
-        value='Y',
-        clearable=False,
-        style={'width': '100px'}
-    )
-    dropdowns_and_figures.append(
-        html.Div([
-            html.Div([
-                html.Label("Variable:"),
-                arg_dropdown,
-            ], style={'display': 'inline-block', 'margin-right': '30px'}),
-            html.Div([
-                html.Label("Frequency:"),
-                freq_dropdown,
-            ], style={'display': 'inline-block'}),
-            dcc.Graph(id=f'line-plot-{i}'),
-        ])
-    )
- # Combine the dropdown menus and figures into a single layout
-app.layout = html.Div(dropdowns_and_figures)
- # Run the app
-app.run_server(debug=True, use_reloader=False)  # Turn off reloader inside Jupyter
+    # Create separate callback functions for each dropdown menu and graph combination
+    for i in range(fig_count):
+        @app.callback(
+            dash.dependencies.Output(f'line-plot-{i}', 'figure'),
+            dash.dependencies.Input(f'arg-dropdown-{i}', 'value'),
+            dash.dependencies.Input(f'freq-dropdown-{i}', 'value')
+        )
+        def update_figure(selected_arg, selected_freq, i=i):
+            fig = plot_ci_matilda(selected_arg, resample_freq=selected_freq)
+            return fig
+
+    # Define the dropdown menus and figures
+    dropdowns_and_figures = []
+    for i in range(fig_count):
+        arg_dropdown = dash.dcc.Dropdown(
+            id=f'arg-dropdown-{i}',
+            options=[{'label': matilda_vars[var][0], 'value': var} for var in matilda_vars.keys()],
+            value=default_vars[i],
+            clearable=False,
+            style={'width': '400px', 'fontFamily': 'Arial', 'fontSize': 15}
+        )
+        freq_dropdown = dash.dcc.Dropdown(
+            id=f'freq-dropdown-{i}',
+            options=[{'label': freq, 'value': freq} for freq in ['M', 'Y', '10Y']],
+            value='Y',
+            clearable=False,
+            style={'width': '100px'}
+        )
+        dropdowns_and_figures.append(
+            dash.html.Div([
+                dash.html.Div([
+                    dash.html.Label("Variable:"),
+                    arg_dropdown,
+                ], style={'display': 'inline-block', 'margin-right': '30px'}),
+                dash.html.Div([
+                    dash.html.Label("Frequency:"),
+                    freq_dropdown,
+                ], style={'display': 'inline-block'}),
+                dash.dcc.Graph(id=f'line-plot-{i}'),
+            ])
+        )
+    # Combine the dropdown menus and figures into a single layout
+    app.layout = dash.html.Div(dropdowns_and_figures)
+
+    if display_mode == 'inLine':
+        # Run the app directly in the output cell
+        app.run_server(mode="inline")
+
+    elif display_mode == 'tab':
+        # Run the app in a new Jupyter Tab
+        app.run_server(mode="jupyterlab")
+
+    else:
+        raise ValueError("Invalid property specified for 'display_mode'. Choose either 'inLine' or 'tab'")
+
+
+# Application example:
+matilda_dash(fig_count=3,
+             default_vars=['total_runoff', 'total_precipitation', 'runoff_from_glaciers'],
+             display_mode='inLine')
+
