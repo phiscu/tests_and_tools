@@ -34,7 +34,7 @@ fast_path = '/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/
 # step3 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-0-6_228204'
 # step4 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-0-48_114102'
 
-step1 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-0-69_lr_templim55-65_targetMB400_1141020'
+step1 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-0-64_lr_templim55-65_targetMB430_2000016'
 
 
 # step1 = fast_path + 'FAST_Paper_4_fix_lrtemp-PCORR-CET_glacarea50'
@@ -51,7 +51,7 @@ def fast_iter(param, interf=4, freqst=2):
     param : int
         The number of input parameters being analyzed.
     interf : int
-        The inference factor, which determines the degree of correlation between the input parameters.
+        The interference factor, which determines the degree of correlation between the input parameters.
     freqst : int
         The frequency step, which specifies the size of the intervals between each frequency at which the Fourier transform is calculated.
     Returns
@@ -59,11 +59,14 @@ def fast_iter(param, interf=4, freqst=2):
     int
         The total number of parameter iterations needed for FAST.
     """
-    return (1 + 4 * interf ** 2 * (1 + (param - 2) * freqst)) * param
+    # return (1 + 4 * interf ** 2 * (1 + (param - 2) * freqst)) * param
+    return 1 + 4 * interf ** 2 * (1 + (param - 2) * freqst)
 
-fast_iter(18, 4)
+
+fast_iter(18, 4, 2)
 
 
+##
 def get_si(fast_results: str, to_csv: bool = False) -> pd.DataFrame:
     """
     Computes the sensitivity indices of a given FAST simulation results file.
@@ -217,7 +220,6 @@ insensitive5 = si_df.index[si_df['ST'] < 0.05].values
 
 interactions = si_df.ST - si_df.S1
 
-
 print('Parameters with a sensitivity index > 0.05:\n\n')
 [print(i) for i in sensitive5]
 
@@ -227,8 +229,8 @@ plot_sensitivity_bars(step1,
                       bar_gap=0.3,
                       show=True)
 
-sensitive7 = si_df.index[si_df['ST'] > 0.07].values
-insensitive7 = si_df.index[si_df['ST'] < 0.07].values
+sensitive6 = si_df.index[si_df['ST'] > 0.061].values
+insensitive6 = si_df.index[si_df['ST'] < 0.061].values
 
 # FAST005: ['lr_temp', 'lr_prec', 'K0', 'LP', 'MAXBAS', 'TT_diff', 'AG', 'RFS']
 # FAST007: ['lr_temp', 'lr_prec', 'BETA', 'K0', 'LP', 'MAXBAS', 'TT_diff', 'CFMAX_rel', 'AG', 'RFS']
