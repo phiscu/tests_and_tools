@@ -15,6 +15,8 @@ import pandas as pd
 import plotly.io as pio
 from matilda.core import matilda_simulation
 from statsmodels.graphics.tsaplots import plot_acf
+import HydroErr as he
+from spotpy.objectivefunctions import mae, rmse
 from pathlib import Path
 host = socket.gethostname()
 if 'node' in host:
@@ -178,19 +180,33 @@ mass_balances.plot()
 plt.ylim(-2,0.7)
 plt.show()
 
-# Compare SWE:
+## Compare SWE:
+
 swe_obs = pd.read_csv('/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/hmadsr/kyzylsuu_swe.csv', parse_dates=['Date'], index_col='Date')
 swe_obs = swe_obs * 1000
 swe_obs = swe_obs['2000-01-01':'2017-09-30']
 swe_sim = results[0].snowpack_off_glaciers['2000-01-01':'2017-09-30'].to_frame(name="SWE_sim")
-
+snow = results[0][['melt_off_glaciers', 'snow_off_glaciers']]['2000-01-01':'2017-09-30']
 swe_sim.index = pd.to_datetime(swe_sim.index)
 swe_obs.index = pd.to_datetime(swe_obs.index)
-swe_df = pd.concat([swe_obs, swe_sim], axis=1)
-swe_df.columns = ['SWE_obs', 'SWE_sim']
+swe_df = pd.concat([swe_obs, swe_sim, snow], axis=1)
+swe_df.columns = ['SWE_obs', 'SWE_sim', 'snow_melt', 'snow_fall']
 
-swe_df.plot()
+# Objective function
+
+swe_df.SWE_sim = swe_df.SWE_sim*0.928
+print('KGE: ' + str(he.kge_2012(swe_df.SWE_sim, swe_df.SWE_obs, remove_zero=False)))
+print('MAE: ' + str(mae(swe_df.SWE_obs, swe_df.SWE_sim)))
+print('RMSE: ' + str(rmse(swe_df.SWE_obs, swe_df.SWE_sim)))
+
+# Plot
+
+swe_df_monthly = swe_df.resample('M').agg({'SWE_obs': 'mean', 'SWE_sim': 'mean', 'snow_melt': 'sum', 'snow_fall': 'sum'})
+swe_df_monthly.plot()
 plt.show()
+
+
+
 ## Write parameters into full dictionary
 
 parameters.update(fix_val)

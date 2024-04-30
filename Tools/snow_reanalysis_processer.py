@@ -76,6 +76,20 @@ swe_df = swe_means(tif_dir, end_year=2016)
 swe_df.to_csv("/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/hmadsr/kyzylsuu_swe.csv")
 
 
+## Scaling factor
+# Glacier mask coarser than outline shapes
+mask99 = geotiff2xr('/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/hmadsr/test_files/processed/HMA_SR_D_v01_WY1999_MASK_kyzylsuu.tif')
+valid_pixels = mask99.where(mask99 != -999)
+total_valid_pixels = valid_pixels.count()
+swe_pixels = (valid_pixels == 0).sum()
+swe_frac = swe_pixels / total_valid_pixels
+# --> 82.8% vs. 89.2% in MATILDA
+
+swe_area_sim = 0.892        # from catchment settings
+swe_area_obs = swe_frac.values
+sf = swe_area_obs / swe_area_sim
+print('SWE scaling factor: ' + str(round(sf, 3)))
+
 ## Plot SWE
 plt.figure(figsize=(12, 6))
 plt.plot(swe_df, color='b', linestyle='-')
@@ -112,6 +126,5 @@ plt.show()
 # plt.ylabel("Y")
 # plt.show()
 
-##
-# Glacier mask ist sehr grob durch 500m pixel --> anzahl der pixel zählen grob mit glacier area vergleichen --> discussion
+
 
