@@ -66,6 +66,8 @@ for subdir in os.listdir(directory_path):
 
         # All values not of type float to NaN
         prec_df = prec_df.apply(pd.to_numeric, errors='coerce')
+        # All NaN to 0 (only three cells and bias adjustment can't handle NaN)
+        prec_df = prec_df.fillna(0)
 
         # Initialize a dictionary to store station DataFrames for the region
         region_stations = {}
@@ -95,7 +97,7 @@ for subdir in os.listdir(directory_path):
 
 # Create buffers around station coordinates and save them to a GeoPackage file
 output = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/GIS/station_gis.gpkg'
-buffered_stations = matilda_functions.create_buffer(station_coords, output, buffer_radius=1000)
+buffered_stations = matilda_functions.create_buffer(station_coords, output, buffer_radius=1000, write_files=False)
 
 ## Data checks and plots
 
@@ -164,6 +166,4 @@ print('Done!')
 ssp_tas_dict = {'SSP2_raw': ssp2_tas_raw, 'SSP2_adjusted': ssp2_tas, 'SSP5_raw': ssp5_tas_raw,
                 'SSP5_adjusted': ssp5_tas}
 ssp_pr_dict = {'SSP2_raw': ssp2_pr_raw, 'SSP2_adjusted': ssp2_pr, 'SSP5_raw': ssp5_pr_raw, 'SSP5_adjusted': ssp5_pr}
-
-
 
