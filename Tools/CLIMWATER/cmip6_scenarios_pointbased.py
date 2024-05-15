@@ -42,49 +42,17 @@ buffered_stations = matilda_functions.create_buffer(station_coords, gis_file, bu
 
 ## Data checks and plots
 
-matilda_functions.plot_region_data(region_data, show=True)#, output='figure.png')
+matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_raw.png')
 
-## Remove temperature outliers
+# Remove temperature outliers
+matilda_functions.process_nested_dict(region_data, matilda_functions.remove_outliers, sd_factor=2)
 
-def remove_outliers(series, sd_factor=2):
-    """
-    Replace outliers in a time series with NaN values and interpolate the missing values using linear interpolation.
-    Parameters
-    ----------
-    series : pandas.Series
-        The input time series data with outliers.
-    sd_factor : int, optional
-        The factor to determine outliers based on standard deviations. Default is 2.
-    Returns
-    -------
-    pandas.Series
-        The time series data with outliers replaced by NaN values and interpolated missing values.
-    """
-    mean = series.mean()
-    std = series.std()
-    outliers = np.abs(series - mean) > sd_factor * std
-    series[outliers] = np.nan
-    series.interpolate(method='linear', inplace=True)
-    return series
-
-
-def process_nested_dict(d, func, *args, **kwargs):
-    for key, value in d.items():
-        if isinstance(value, pd.DataFrame):
-            d[key] = func(value, *args, **kwargs)
-        elif isinstance(value, dict):
-            process_nested_dict(value, func, *args, **kwargs)
-
-
-# Call process_nested_dict with the custom function
-process_nested_dict(region_data, remove_outliers, sd_factor=2)
+# Remove years with an annual precipitation of 0
+matilda_functions.process_nested_dict(region_data, matilda_functions.remove_annual_zeros)
 
 # Plot again
-matilda_functions.plot_region_data(region_data, show=True)#, output='figure.png')
+matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_filtered.png')
 
-##
-
-# REMOVE FULL YEARS WITH PRECIPITATION 0
 
 ######
 # Projection class (input: )
@@ -106,7 +74,7 @@ cmip_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo/Kashkada
 
 aws = matilda_functions.search_dict(region_data, station)
 
-# cmip6_station = matilda_functions.CMIP6DataProcessor(buffer_file, station, starty, endy, cmip_dir)
+cmip6_station = matilda_functions.CMIP6DataProcessor(buffer_file, station, starty, endy, cmip_dir)
 
 # cmip6_station.download_cmip6_data()
 
@@ -130,10 +98,13 @@ prec_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/prec_' + station
 
 matilda_functions.cmip_plot_combined(data=temp_cmip, target=aws, title='10y Mean of Air Temperature', target_label=station,
                   filename='cmip6_temperature_bias_adjustment.png', out_dir=output + 'Plots/')
-matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws, title='10y Mean of Monthly Precipitation', precip=True,
+matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws.dropna(), title='10y Mean of Monthly Precipitation', precip=True,
                    target_label=station, intv_mean='10Y', filename='cmip6_precipitation_bias_adjustment.png', out_dir=output + 'Plots/')
 print('Figures for CMIP6 bias adjustment created.')
 
+# ROLLING MEANS INSTEAD OF MULTIPLE RESAMPLING??
+
+# Change station label
 
 ##
 # clean up function in the end to delete annual cmip files

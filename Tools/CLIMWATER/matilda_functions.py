@@ -116,13 +116,17 @@ def search_dict(input_dict, key):
 
 def plot_meteo(ax, aws, aws_name):
     color = 'tab:red'
-    ax.plot(aws.index, aws['temp'], color=color, alpha=0.7)
+    # Drop NaN values before plotting
+    aws_temp = aws.dropna(subset=['temp'])
+    ax.plot(aws_temp.index, aws_temp['temp'], color=color, alpha=0.7)
     ax.set_ylabel('Daily Temperature [K]', color=color)
     ax.tick_params(axis='y', labelcolor=color)
 
     ax2 = ax.twinx()
     color = 'tab:blue'
-    ax2.plot(aws.index, aws['prec'], color=color, alpha=0.7)
+    # Drop NaN values before plotting
+    aws_prec = aws.dropna(subset=['prec'])
+    ax2.plot(aws_prec.index, aws_prec['prec'], color=color, alpha=0.7)
     ax2.set_ylabel('Daily Precipitation [mm]', color=color)
     ax2.tick_params(axis='y', labelcolor=color)
 
@@ -143,10 +147,66 @@ def plot_region_data(region_data, show=True, output=None):
     plt.tight_layout()
 
     if output:
+        # Create the directory if it doesn't exist
+        output_dir = os.path.dirname(output)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
         plt.savefig(output, format='png')
 
     if show:
         plt.show()
+
+
+def remove_outliers(series, sd_factor=2):
+    """
+    Replace outliers in a time series with NaN values and interpolate the missing values using linear interpolation.
+    Parameters
+    ----------
+    series : pandas.Series
+        The input time series data with outliers.
+    sd_factor : int, optional
+        The factor to determine outliers based on standard deviations. Default is 2.
+    Returns
+    -------
+    pandas.Series
+        The time series data with outliers replaced by NaN values and interpolated missing values.
+    """
+    mean = series.mean()
+    std = series.std()
+    outliers = np.abs(series - mean) > sd_factor * std
+    series[outliers] = np.nan
+    series.interpolate(method='linear', inplace=True)
+    return series
+
+
+def process_nested_dict(d, func, *args, **kwargs):
+    for key, value in d.items():
+        if isinstance(value, pd.DataFrame):
+            d[key] = func(value, *args, **kwargs)
+        elif isinstance(value, dict):
+            process_nested_dict(value, func, *args, **kwargs)
+
+
+def remove_annual_zeros(df):
+    """
+    Sets all days to NaN that are in years, where the annual precipitation sum is 0.
+    Parameters:
+        df (DataFrame): Input dataframe with a datetime index and 'prec' column.
+    Returns:
+        DataFrame: Processed dataframe with days in zero-annual-precipitation years set to NaN.
+    """
+    # Group by year and calculate annual precipitation sum
+    annual_precipitation = df.groupby(df.index.year)['prec'].sum()
+
+    # Identify years with zero annual precipitation
+    zero_precipitation_years = annual_precipitation[annual_precipitation == 0].index
+
+    # Set days in zero-precipitation years to NaN
+    for year in zero_precipitation_years:
+        df.loc[df.index.year == year, 'prec'] = pd.NA
+
+    return df
 
 
 def custom_buffer(point, buffer_radius_meters):
@@ -588,15 +648,35 @@ class CMIP6DataProcessor:
 
         print('Running bias adjustment routine...')
         aws = search_dict(region_data, self.station)
-        train_start = str(aws.index.min())
-        train_end = str(aws.index.max())
-        self.ssp2_tas = adjust_bias(predictand=self.ssp2_tas_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
-        self.ssp5_tas = adjust_bias(predictand=self.ssp5_tas_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
-        self.ssp2_pr = adjust_bias(predictand=self.ssp2_pr_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
-        self.ssp5_pr = adjust_bias(predictand=self.ssp5_pr_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
 
-        self.ssp_tas_dict = {'SSP2_raw': self.ssp2_tas_raw, 'SSP2_adjusted': self.ssp2_tas, 'SSP5_raw': self.ssp5_tas_raw, 'SSP5_adjusted': self.ssp5_tas}
-        self.ssp_pr_dict = {'SSP2_raw': self.ssp2_pr_raw, 'SSP2_adjusted': self.ssp2_pr, 'SSP5_raw': self.ssp5_pr_raw, 'SSP5_adjusted': self.ssp5_pr}
+        # Find the first and last non-NaN timestamp for each variable
+        first_valid_temp = aws['temp'].first_valid_index()
+        last_valid_temp = aws['temp'].last_valid_index()
+        first_valid_prec = aws['prec'].first_valid_index()
+        last_valid_prec = aws['prec'].last_valid_index()
+
+        # Adjust training start and end dates for temperature
+        train_start_temp = str(first_valid_temp)
+        train_end_temp = str(last_valid_temp)
+
+        # Adjust training start and end dates for precipitation
+        train_start_prec = str(first_valid_prec)
+        train_end_prec = str(last_valid_prec)
+
+        # Adjust bias for temperature and precipitation
+        self.ssp2_tas = adjust_bias(predictand=self.ssp2_tas_raw, predictor=aws, era5=False,
+                                    train_start=train_start_temp, train_end=train_end_temp)
+        self.ssp5_tas = adjust_bias(predictand=self.ssp5_tas_raw, predictor=aws, era5=False,
+                                    train_start=train_start_temp, train_end=train_end_temp)
+        self.ssp2_pr = adjust_bias(predictand=self.ssp2_pr_raw, predictor=aws, era5=False, train_start=train_start_prec,
+                                   train_end=train_end_prec)
+        self.ssp5_pr = adjust_bias(predictand=self.ssp5_pr_raw, predictor=aws, era5=False, train_start=train_start_prec,
+                                   train_end=train_end_prec)
+
+        self.ssp_tas_dict = {'SSP2_raw': self.ssp2_tas_raw, 'SSP2_adjusted': self.ssp2_tas,
+                             'SSP5_raw': self.ssp5_tas_raw, 'SSP5_adjusted': self.ssp5_tas}
+        self.ssp_pr_dict = {'SSP2_raw': self.ssp2_pr_raw, 'SSP2_adjusted': self.ssp2_pr, 'SSP5_raw': self.ssp5_pr_raw,
+                            'SSP5_adjusted': self.ssp5_pr}
 
         print('Done!')
 
