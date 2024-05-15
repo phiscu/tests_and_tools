@@ -23,83 +23,68 @@ import matilda_functions
 import geopandas as gpd
 from shapely.geometry import Point
 import utm
+import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
-
-# Directory path
+# Paths
 directory_path = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo'
+output = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/CMIP6/'
 
-# Dictionaries to store data for each region
-region_data = {}
-station_coords = {}
-
-# Iterate over the subdirectories
-for subdir in os.listdir(directory_path):
-    subdir_path = os.path.join(directory_path, subdir)
-
-    # Check if the subdirectory is a directory
-    if os.path.isdir(subdir_path):
-        # Read the AWS coordinates CSV file
-        coords_file = os.path.join(subdir_path, 'aws_coords.csv')
-        coords_df = pd.read_csv(coords_file)
-
-        # Read precipitation data
-        prec_file = os.path.join(subdir_path, f'{subdir}_prec.xlsx')
-        prec_df = pd.read_excel(prec_file)
-
-        # Read temperature data
-        temp_file = os.path.join(subdir_path, f'{subdir}_temp.xlsx')
-        temp_df = pd.read_excel(temp_file)
-
-        # Create datetime index from ['day', 'month', 'year'] columns
-        prec_df['date'] = pd.to_datetime(prec_df[['year', 'month', 'day']])
-        temp_df['date'] = pd.to_datetime(temp_df[['year', 'month', 'day']])
-
-        # Set the datetime index and drop the original time columns
-        prec_df.set_index('date', inplace=True)
-        prec_df.drop(columns=['day', 'month', 'year'], inplace=True)
-        temp_df.set_index('date', inplace=True)
-        temp_df.drop(columns=['day', 'month', 'year'], inplace=True)
-
-        # Convert Celsius to Kelvin for consistency with CMIP6
-        temp_df = temp_df + 273.15
-
-        # All values not of type float to NaN
-        prec_df = prec_df.apply(pd.to_numeric, errors='coerce')
-        # All NaN to 0 (only three cells and bias adjustment can't handle NaN)
-        prec_df = prec_df.fillna(0)
-
-        # Initialize a dictionary to store station DataFrames for the region
-        region_stations = {}
-
-        # Iterate over each station in the region
-        for station in temp_df.columns:
-            station_df = pd.DataFrame({'temp': temp_df[station], 'prec': prec_df[station]})
-            region_stations[station] = station_df  # Store station DataFrame in the dictionary
-
-        # Store the dictionary of station DataFrames in the region_data dictionary
-        region_data[subdir] = region_stations
-
-        # Create a dictionary to store station coordinates
-        station_dict = {}
-        # Iterate over each row in the coordinates DataFrame
-        for index, row in coords_df.iterrows():
-            station_name = row['Name']
-            latitude = row['Latitude']
-            longitude = row['Longitude']
-
-            # Store station coordinates as a tuple in the dictionary
-            if station_name in region_stations.keys():
-                station_dict[station_name] = (longitude, latitude)  # Note: Changed order to (lon, lat)
-
-        # Store the station coordinates dictionary in the main dictionary
-        station_coords[subdir] = station_dict
+# Read data
+region_data, station_coords = matilda_functions.read_station_data(directory_path)
 
 # Create buffers around station coordinates and save them to a GeoPackage file
-output = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/GIS/station_gis.gpkg'
-buffered_stations = matilda_functions.create_buffer(station_coords, output, buffer_radius=1000, write_files=False)
+gis_dir = output + 'GIS/'
+gis_file = gis_dir + 'station_gis.gpkg'
+if not os.path.exists(gis_dir):
+    os.makedirs(gis_dir)
+buffered_stations = matilda_functions.create_buffer(station_coords, gis_file, buffer_radius=1000, write_files=True)
 
 ## Data checks and plots
+
+matilda_functions.plot_region_data(region_data, show=True)#, output='figure.png')
+
+## Remove temperature outliers
+
+def remove_outliers(series, sd_factor=2):
+    """
+    Replace outliers in a time series with NaN values and interpolate the missing values using linear interpolation.
+    Parameters
+    ----------
+    series : pandas.Series
+        The input time series data with outliers.
+    sd_factor : int, optional
+        The factor to determine outliers based on standard deviations. Default is 2.
+    Returns
+    -------
+    pandas.Series
+        The time series data with outliers replaced by NaN values and interpolated missing values.
+    """
+    mean = series.mean()
+    std = series.std()
+    outliers = np.abs(series - mean) > sd_factor * std
+    series[outliers] = np.nan
+    series.interpolate(method='linear', inplace=True)
+    return series
+
+
+def process_nested_dict(d, func, *args, **kwargs):
+    for key, value in d.items():
+        if isinstance(value, pd.DataFrame):
+            d[key] = func(value, *args, **kwargs)
+        elif isinstance(value, dict):
+            process_nested_dict(value, func, *args, **kwargs)
+
+
+# Call process_nested_dict with the custom function
+process_nested_dict(region_data, remove_outliers, sd_factor=2)
+
+# Plot again
+matilda_functions.plot_region_data(region_data, show=True)#, output='figure.png')
+
+##
+
+# REMOVE FULL YEARS WITH PRECIPITATION 0
 
 ######
 # Projection class (input: )
@@ -112,58 +97,43 @@ buffered_stations = matilda_functions.create_buffer(station_coords, output, buff
 
 ## GEE
 
-
-# Example:
-buffer_file = output
+# Example
+buffer_file = gis_file
 station = 'Karshi'
 starty = 1979
 endy = 2100
-cmip_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo/Kashkadarya/cmip6/'                        # Loop through dicts to maintain regional folder structure
+cmip_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo/Kashkadarya/cmip6/'
 
-
-# Set up GEE
-try:
-    ee.Initialize()
-except Exception as e:
-    ee.Authenticate()
-    ee.Initialize()
-
-# Define target polygon
-all_buffers = gpd.read_file(buffer_file, layer='station_buffers')
-buffer = all_buffers.loc[all_buffers['Station_Name'] == station]
-buffer_ee = geemap.geopandas_to_ee(buffer)
-
-# Download CMIP6 data
-# downloader_t = matilda_functions.CMIPDownloader(var='tas', starty=starty, endy=endy, shape=buffer_ee, processes=5, dir=cmip_dir)
-# downloader_t.download()
-# downloader_p = matilda_functions.CMIPDownloader(var='pr', starty=starty, endy=endy, shape=buffer_ee, processes=5, dir=cmip_dir)
-# downloader_p.download()
-
-# Process CMIP6 data
-processor_t = matilda_functions.CMIPProcessor(file_dir=cmip_dir, var='tas', start=starty, end=endy)
-ssp2_tas_raw, ssp5_tas_raw = processor_t.get_results()
-
-processor_p = matilda_functions.CMIPProcessor(file_dir=cmip_dir, var='pr', start=starty, end=endy)
-ssp2_pr_raw, ssp5_pr_raw = processor_p.get_results()
-
-print(ssp2_tas_raw.info())
-print('Models that failed the consistency checks:\n')
-print(processor_t.dropped_models)
-
-
-# Bias adjustment
-print('Running bias adjustment routine...')
 aws = matilda_functions.search_dict(region_data, station)
-train_start = str(aws.index.min())
-train_end = str(aws.index.max())
-ssp2_tas = matilda_functions.adjust_bias(predictand=ssp2_tas_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
-ssp5_tas = matilda_functions.adjust_bias(predictand=ssp5_tas_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
-ssp2_pr = matilda_functions.adjust_bias(predictand=ssp2_pr_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
-ssp5_pr = matilda_functions.adjust_bias(predictand=ssp5_pr_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
-print('Done!')
 
-# store our raw and adjusted data in dictionaries.
-ssp_tas_dict = {'SSP2_raw': ssp2_tas_raw, 'SSP2_adjusted': ssp2_tas, 'SSP5_raw': ssp5_tas_raw,
-                'SSP5_adjusted': ssp5_tas}
-ssp_pr_dict = {'SSP2_raw': ssp2_pr_raw, 'SSP2_adjusted': ssp2_pr, 'SSP5_raw': ssp5_pr_raw, 'SSP5_adjusted': ssp5_pr}
+# cmip6_station = matilda_functions.CMIP6DataProcessor(buffer_file, station, starty, endy, cmip_dir)
 
+# cmip6_station.download_cmip6_data()
+
+# cmip6_station.bias_adjustment(region_data)
+# temp_cmip = cmip6_station.ssp_tas_dict
+# prec_cmip = cmip6_station.ssp_pr_dict
+
+## Data checks
+
+# temp_cmip, prec_cmip = matilda_functions.apply_filters(temp_cmip, prec_cmip, zscore_threshold=3, jump_threshold=5, resampling_rate='Y')
+
+## Back-up files
+
+# matilda_functions.dict_to_pickle(temp_cmip, output + 'adjusted/temp_' + station + '_adjusted.pickle')
+# matilda_functions.dict_to_pickle(prec_cmip, output + 'adjusted/prec_' + station + '_adjusted.pickle')
+
+temp_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/temp_' + station + '_adjusted.pickle')
+prec_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/prec_' + station + '_adjusted.pickle')
+
+## Plots
+
+matilda_functions.cmip_plot_combined(data=temp_cmip, target=aws, title='10y Mean of Air Temperature', target_label=station,
+                  filename='cmip6_temperature_bias_adjustment.png', out_dir=output + 'Plots/')
+matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws, title='10y Mean of Monthly Precipitation', precip=True,
+                   target_label=station, intv_mean='10Y', filename='cmip6_precipitation_bias_adjustment.png', out_dir=output + 'Plots/')
+print('Figures for CMIP6 bias adjustment created.')
+
+
+##
+# clean up function in the end to delete annual cmip files
