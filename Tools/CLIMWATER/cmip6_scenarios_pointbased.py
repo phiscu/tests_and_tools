@@ -12,98 +12,18 @@ import numpy as np
 import warnings
 from shapely.errors import ShapelyDeprecationWarning
 import geopandas as gpd
+import ee
+import geemap
 import utm
 from pyproj import CRS
-warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
-
+import sys
+wd = os.getcwd()
+sys.path.append(wd + '/tests_and_tools/Tools/CLIMWATER')
+import matilda_functions
 import geopandas as gpd
 from shapely.geometry import Point
 import utm
-
-
-def custom_buffer(point, buffer_radius_meters):
-    """
-    Create a circular buffer around a point with a given radius in meters.
-
-    Args:
-    - point (tuple): Coordinate (longitude, latitude) of the point.
-    - buffer_radius_meters (float): Radius of the buffer in meters.
-
-    Returns:
-    - buffer (shapely.geometry.Polygon): Circular buffer around the point.
-    """
-    lon, lat = point
-
-    point_geom = Point(lon, lat)
-
-    # Projected coordinate system (EPSG:3857) for meters-based calculations
-    project_meters = pyproj.CRS('EPSG:3857')
-
-    # Original coordinate system (EPSG:4326) for latitude and longitude
-    project_latlon = pyproj.CRS('EPSG:4326')
-
-    # Create transformers
-    project = pyproj.Transformer.from_crs(project_latlon, project_meters, always_xy=True).transform
-    reproject = pyproj.Transformer.from_crs(project_meters, project_latlon, always_xy=True).transform
-
-    # Convert buffer radius from meters to degrees (approximate)
-    lon_m, lat_m = transform(project, point_geom).x, transform(project, point_geom).y
-    point_buffer = Point(lon_m + buffer_radius_meters, lat_m)
-    lon_buffer, lat_buffer = transform(reproject, point_buffer).x, transform(reproject, point_buffer).y
-
-    buffer_radius_degrees = np.abs(lon_buffer - lon)
-
-    # Create a buffer around the station coordinates
-    buffer = point_geom.buffer(buffer_radius_degrees)
-
-    return buffer
-
-
-def create_buffer(station_coords, output_dir, buffer_radius=1000, write_files=True):
-    """
-    Create spatial buffers around station coordinates and save them in a GeoPackage (.gpkg) file.
-
-    Args:
-    - station_coords (dict): Dictionary containing station coordinates for each region.
-    - output_dir (str): Directory path where the GeoPackage file will be saved.
-    - buffer_radius (float): Radius of the buffer in degrees (or any appropriate unit).
-    """
-    # Create an empty GeoDataFrame to store the buffers
-    buffer_gdf = gpd.GeoDataFrame(columns=['Station_Name', 'geometry'])
-
-    # Create an empty GeoDataFrame to store the station locations
-    locations_gdf = gpd.GeoDataFrame(columns=['Station_Name', 'geometry'])
-
-    buffer_dict = {}
-
-    # Iterate over each region
-    for region, stations in station_coords.items():
-        region_buffers = {}
-        # Iterate over each station in the region
-        for station_name, coordinates in stations.items():
-            # Create a buffer around the station coordinates
-            buffer_geom = custom_buffer(coordinates, buffer_radius)
-            region_buffers[station_name] = buffer_geom
-
-            # Add the buffer geometry to the GeoDataFrame
-            buffer_gdf = buffer_gdf.append({'Station_Name': station_name,
-                                            'geometry': buffer_geom}, ignore_index=True)
-
-            # Create a point geometry for station location
-            point_geom = Point(coordinates)
-
-            # Add the point geometry to the GeoDataFrame
-            locations_gdf = locations_gdf.append({'Station_Name': station_name,
-                                                  'geometry': point_geom}, ignore_index=True)
-        buffer_dict[region] = region_buffers
-
-    # Save the GeoDataFrames to a GeoPackage file
-    if write_files:
-        output_file = os.path.join(output_dir, 'station_data.gpkg')
-        buffer_gdf.to_file(output_file, driver='GPKG', layer='station_buffers')
-        locations_gdf.to_file(output_file, driver='GPKG', layer='station_locations')
-
-    return buffer_dict
+warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 # Directory path
@@ -141,6 +61,12 @@ for subdir in os.listdir(directory_path):
         temp_df.set_index('date', inplace=True)
         temp_df.drop(columns=['day', 'month', 'year'], inplace=True)
 
+        # Convert Celsius to Kelvin for consistency with CMIP6
+        temp_df = temp_df + 273.15
+
+        # All values not of type float to NaN
+        prec_df = prec_df.apply(pd.to_numeric, errors='coerce')
+
         # Initialize a dictionary to store station DataFrames for the region
         region_stations = {}
 
@@ -168,13 +94,13 @@ for subdir in os.listdir(directory_path):
         station_coords[subdir] = station_dict
 
 # Create buffers around station coordinates and save them to a GeoPackage file
-output_directory = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/GIS'
-buffered_stations = create_buffer(station_coords, output_directory)
+output = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/GIS/station_gis.gpkg'
+buffered_stations = matilda_functions.create_buffer(station_coords, output, buffer_radius=1000)
 
 ## Data checks and plots
 
 ######
-# Projection class (input: Region)
+# Projection class (input: )
 
 # Download CMIP6 for buffers
 # Bias adjust CMIP6 with station data
@@ -182,4 +108,62 @@ buffered_stations = create_buffer(station_coords, output_directory)
 # Plot data
 
 
-##
+## GEE
+
+
+# Example:
+buffer_file = output
+station = 'Karshi'
+starty = 1979
+endy = 2100
+cmip_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo/Kashkadarya/cmip6/'                        # Loop through dicts to maintain regional folder structure
+
+
+# Set up GEE
+try:
+    ee.Initialize()
+except Exception as e:
+    ee.Authenticate()
+    ee.Initialize()
+
+# Define target polygon
+all_buffers = gpd.read_file(buffer_file, layer='station_buffers')
+buffer = all_buffers.loc[all_buffers['Station_Name'] == station]
+buffer_ee = geemap.geopandas_to_ee(buffer)
+
+# Download CMIP6 data
+# downloader_t = matilda_functions.CMIPDownloader(var='tas', starty=starty, endy=endy, shape=buffer_ee, processes=5, dir=cmip_dir)
+# downloader_t.download()
+# downloader_p = matilda_functions.CMIPDownloader(var='pr', starty=starty, endy=endy, shape=buffer_ee, processes=5, dir=cmip_dir)
+# downloader_p.download()
+
+# Process CMIP6 data
+processor_t = matilda_functions.CMIPProcessor(file_dir=cmip_dir, var='tas', start=starty, end=endy)
+ssp2_tas_raw, ssp5_tas_raw = processor_t.get_results()
+
+processor_p = matilda_functions.CMIPProcessor(file_dir=cmip_dir, var='pr', start=starty, end=endy)
+ssp2_pr_raw, ssp5_pr_raw = processor_p.get_results()
+
+print(ssp2_tas_raw.info())
+print('Models that failed the consistency checks:\n')
+print(processor_t.dropped_models)
+
+
+# Bias adjustment
+print('Running bias adjustment routine...')
+aws = matilda_functions.search_dict(region_data, station)
+train_start = str(aws.index.min())
+train_end = str(aws.index.max())
+ssp2_tas = matilda_functions.adjust_bias(predictand=ssp2_tas_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
+ssp5_tas = matilda_functions.adjust_bias(predictand=ssp5_tas_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
+ssp2_pr = matilda_functions.adjust_bias(predictand=ssp2_pr_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
+ssp5_pr = matilda_functions.adjust_bias(predictand=ssp5_pr_raw, predictor=aws, era5=False, train_start=train_start, train_end=train_end)
+print('Done!')
+
+# store our raw and adjusted data in dictionaries.
+ssp_tas_dict = {'SSP2_raw': ssp2_tas_raw, 'SSP2_adjusted': ssp2_tas, 'SSP5_raw': ssp5_tas_raw,
+                'SSP5_adjusted': ssp5_tas}
+ssp_pr_dict = {'SSP2_raw': ssp2_pr_raw, 'SSP2_adjusted': ssp2_pr, 'SSP5_raw': ssp5_pr_raw, 'SSP5_adjusted': ssp5_pr}
+
+
+
