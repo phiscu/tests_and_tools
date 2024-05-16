@@ -897,6 +897,7 @@ def cmip_plot(ax, df, target, title=None, precip=False, intv_sum='M', intv_mean=
     ax.set_title(title)
     ax.grid(True)
 
+
 def cmip_plot_combined(data, target, title=None, precip=False, intv_sum='M', intv_mean='10Y',
                        target_label='Target', show=False, filename=None, out_dir='./', rolling=None):
     """Combines multiple subplots of climate data in different scenarios before and after bias adjustment.
@@ -937,7 +938,7 @@ def df2long(df, intv_sum='M', intv_mean='Y', precip=False):
     """Resamples dataframes and converts them into long format to be passed to seaborn.lineplot()."""
 
     if precip:
-        df = df.resample(intv_sum).sum().resample(intv_mean).mean()
+        df = df.resample(intv_sum).sum()
         df = df.reset_index()
         df = df.melt('TIMESTAMP', var_name='model', value_name='prec')
     else:
@@ -947,7 +948,8 @@ def df2long(df, intv_sum='M', intv_mean='Y', precip=False):
     return df
 
 
-def cmip_plot_ensemble(cmip, target, precip=False, intv_sum='M', intv_mean='Y', figsize=(10, 6), show=True, out_dir='./'):
+def cmip_plot_ensemble(cmip, target, precip=False, intv_sum='M', intv_mean='Y', figsize=(10, 6), site_label:str=None,
+                       target_label='ERA5L', show=True, out_dir='./', filename='cmip6_ensemble'):
     """
     Plots the multi-model mean of climate scenarios including the 90% confidence interval.
     Parameters
@@ -979,43 +981,48 @@ def cmip_plot_ensemble(cmip, target, precip=False, intv_sum='M', intv_mean='Y', 
     # create a new dictionary with the same keys but new values from the list
     col_dict = {key: value for key, value in zip(cmip.keys(), colors)}
 
+    if site_label is None:
+        site_label = str()
+    else:
+        site_label = f'"{site_label}" - '
+
     if precip:
         for i in cmip.keys():
             df = df2long(cmip[i], intv_sum=intv_sum, intv_mean=intv_mean, precip=True)
             sns.lineplot(data=df, x='TIMESTAMP', y='prec', color=col_dict[i])
-        axis.set(xlabel='Year', ylabel='Mean Precipitation [mm]')
+        axis.set(xlabel='Year', ylabel='Precipitation [mm]')
         if intv_sum == 'M':
-            figure.suptitle('Mean Monthly Precipitation', fontweight='bold')
+            figure.suptitle(site_label + 'Ensemble Mean of Monthly Precipitation', fontweight='bold')
         elif intv_sum == 'Y':
-            figure.suptitle('Mean Annual Precipitation', fontweight='bold')
-        target_plot = axis.plot(target.resample(intv_sum).sum().resample(intv_mean).mean(), linewidth=1.5, c='black',
-                                label='ERA5', linestyle='dashed')
+            figure.suptitle(site_label + 'Ensemble Mean of Annual Precipitation', fontweight='bold')
+        target_plot = axis.plot(target.resample(intv_sum).sum(), linewidth=1.5, c='black',
+                                label=target_label, linestyle='dashed')
     else:
         for i in cmip.keys():
             df = df2long(cmip[i], intv_mean=intv_mean)
             sns.lineplot(data=df, x='TIMESTAMP', y='temp', color=col_dict[i])
-        axis.set(xlabel='Year', ylabel='Mean Air Temperature [K]')
+        axis.set(xlabel='Year', ylabel='Air Temperature [K]')
         if intv_mean == '10Y':
-            figure.suptitle('Mean 10y Air Temperature', fontweight='bold')
+            figure.suptitle(site_label + 'Ensemble Mean of 10y Air Temperature', fontweight='bold')
         elif intv_mean == 'Y':
-            figure.suptitle('Mean Annual Air Temperature', fontweight='bold')
+            figure.suptitle(site_label + 'Ensemble Mean of Annual Air Temperature', fontweight='bold')
         elif intv_mean == 'M':
-            figure.suptitle('Mean Monthly Air Temperature', fontweight='bold')
+            figure.suptitle(site_label + 'Ensemble Mean of Monthly Air Temperature', fontweight='bold')
         target_plot = axis.plot(target.resample(intv_mean).mean(), linewidth=1.5, c='black',
-                                label='ERA5', linestyle='dashed')
+                                label=target_label, linestyle='dashed')
     axis.legend(['SSP2_raw', '_ci1', 'SSP2_adjusted', '_ci2', 'SSP5_raw', '_ci3', 'SSP5_adjusted', '_ci4'],
                 loc="upper center", bbox_to_anchor=(0.43, -0.15), ncol=4,
                 frameon=False)  # First legend --> Workaround as seaborn lists CIs in legend
-    leg = Legend(axis, target_plot, ['ERA5L'], loc='upper center', bbox_to_anchor=(0.83, -0.15), ncol=1,
-                 frameon=False)  # Second legend (ERA5)
+    leg = Legend(axis, target_plot, [target_label], loc='upper center', bbox_to_anchor=(0.83, -0.15), ncol=1,
+                 frameon=False)  # Second legend (Target)
     axis.add_artist(leg)
     plt.grid()
 
     figure.tight_layout(rect=[0, 0.02, 1, 1])  # Make some room at the bottom
     if not precip:
-        plt.savefig(out_dir + 'cmip6_ensemble_temperature.png')
+        plt.savefig(out_dir + f'{filename}_temperature.png')
     else:
-        plt.savefig(out_dir + 'cmip6_ensemble_precipitation.png')
+        plt.savefig(out_dir + f'{filename}_precipitation.png')
 
     if show:
         plt.show()
@@ -1074,7 +1081,8 @@ def prob_plot(original, target, corrected, ax, title=None, ylabel="Temperature [
     return fig
 
 
-def pp_matrix(original, target, corrected, scenario=None, nrow=7, ncol=5, precip=False, show=False, out_dir='./'):
+def pp_matrix(original, target, corrected, scenario=None, nrow=7, ncol=5, precip=False,
+              starty=1979, endy=2022, show=False, out_dir='./', target_label='ERA5-Land', site:str=None):
     """
     Arranges the prob_plots of all CMIP6 models in a matrix and adds the R² score.
     Parameters
@@ -1102,7 +1110,15 @@ def pp_matrix(original, target, corrected, scenario=None, nrow=7, ncol=5, precip
     None
     """
 
-    period = slice('1979-01-01', '2022-12-31')
+    starty = f'{str(starty)}-01-01'
+    endy = f'{str(endy)}-12-31'
+    period = slice(starty, endy)
+
+    if site is None:
+        site_label = str()
+    else:
+        site_label = f'"{site}" - '
+
     if precip:
         var = 'Precipitation'
         var_label = 'Monthly ' + var
@@ -1124,23 +1140,23 @@ def pp_matrix(original, target, corrected, scenario=None, nrow=7, ncol=5, precip
         ax.set_title(col, fontweight='bold')
 
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, ['original (CMIP6 raw)', 'target (ERA5-Land)', 'adjusted (CMIP6 after SDM)'], loc='lower right',
+    fig.legend(handles, ['original (CMIP6 raw)', f'target ({target_label})', 'adjusted (CMIP6 after SDM)'], loc='lower right',
                bbox_to_anchor=(0.96, 0.024), fontsize=20)
     plt.tight_layout()
     fig.subplots_adjust(hspace=0.7, wspace=0.4)
     starty = period.start.split('-')[0]
     endy = period.stop.split('-')[0]
     if scenario is None:
-        fig.suptitle('Probability Plots of CMIP6 and ERA5-Land ' + var_label + ' (' + starty + '-' + endy + ')',
+        fig.suptitle(site_label + f'Probability Plots of CMIP6 and {target_label} ' + var_label + ' (' + starty + '-' + endy + ')',
                      fontweight='bold', fontsize=20)
     else:
-        fig.suptitle('Probability Plots of CMIP6 (' + scenario + ') and ERA5-Land ' + var_label +
+        fig.suptitle(site_label + 'Probability Plots of CMIP6 (' + scenario + f') and {target_label} ' + var_label +
                      ' (' + starty + '-' + endy + ')', fontweight='bold', fontsize=20)
     plt.subplots_adjust(top=0.93)
     if precip:
-        plt.savefig(out_dir + f'cmip6_ensemble_precipitation_probplots_{scenario}.png')
+        plt.savefig(out_dir + f'cmip6_ensemble_probplots_{site}_precipitation_{scenario}.png')
     else:
-        plt.savefig(out_dir + f'cmip6_ensemble_temperature_probplots_{scenario}.png')
+        plt.savefig(out_dir + f'cmip6_ensemble_probplots_{site}_temperature_{scenario}.png')
 
     if show:
         plt.show()

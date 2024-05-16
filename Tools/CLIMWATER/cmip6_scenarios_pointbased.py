@@ -95,13 +95,52 @@ temp_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/temp_' + station
 prec_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/prec_' + station + '_adjusted.pickle')
 
 ## Plots
-
-matilda_functions.cmip_plot_combined(data=temp_cmip, target=aws, title=f'"{station}" - 5y Rolling Mean of Annual Air Temperature', target_label='Observations',
-                  filename='cmip6_temperature_bias_adjustment.png',
+# Lineplots with all models
+matilda_functions.cmip_plot_combined(data=temp_cmip, target=aws,
+                                     title=f'"{station}" - 5y Rolling Mean of Annual Air Temperature', target_label='Observations',
+                  filename=f'cmip6_bias_adjustment_{station}_temperature.png', show=True,
                                      intv_mean='Y', rolling=5, out_dir=output + 'Plots/')
-matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws.dropna(), title=f'"{station}" - 5y Rolling Mean of Annual Precipitation', precip=True,
-                   target_label='Observations', filename='cmip6_precipitation_bias_adjustment.png',
+matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws.dropna(),
+                                     title=f'"{station}" - 5y Rolling Mean of Annual Precipitation', precip=True,
+                   target_label='Observations', filename=f'cmip6_bias_adjustment_{station}_precipitation.png', show=True,
                                      intv_sum='Y', rolling=5, out_dir=output + 'Plots/')
 print('Figures for CMIP6 bias adjustment created.')
 
+# Ensemble mean plots
+matilda_functions.cmip_plot_ensemble(temp_cmip, aws['temp'], intv_mean='Y', show=True, out_dir=output + 'Plots/',
+                                     target_label="Observations", filename=f'cmip6_ensemble_{station}',
+                                     site_label=station)
+matilda_functions.cmip_plot_ensemble(prec_cmip, aws['prec'].dropna(), precip=True, intv_sum='Y',
+                                     show=True, out_dir=output + 'Plots/', target_label="Observations",
+                                     site_label=station, filename=f'cmip6_ensemble_{station}')
+print('Figures for CMIP6 ensembles created.')
+
+## Probability plots:
+
+start_temp = aws['temp'].first_valid_index().year
+end_temp = aws['temp'].last_valid_index().year
+start_prec = aws['prec'].dropna().first_valid_index().year
+end_prec = aws['prec'].dropna().last_valid_index().year
+
+matilda_functions.pp_matrix(temp_cmip['SSP2_raw'], aws['temp'], temp_cmip['SSP2_adjusted'], scenario='SSP2',
+                            starty=start_temp, endy=end_temp, target_label='Observed',
+                            out_dir=output + 'Plots/', show=True, site=station)
+matilda_functions.pp_matrix(temp_cmip['SSP5_raw'], aws['temp'], temp_cmip['SSP5_adjusted'], scenario='SSP5',
+                            starty=start_temp, endy=end_temp, target_label='Observed',
+                            out_dir=output + 'Plots/', show=True, site=station)
+
+matilda_functions.pp_matrix(prec_cmip['SSP2_raw'], aws['prec'].dropna().astype(float), prec_cmip['SSP2_adjusted'],
+                            precip=True, starty=start_prec, endy=end_prec, target_label='Observed',
+                            scenario='SSP2', out_dir=output + 'Plots/', show=True, site=station)
+matilda_functions.pp_matrix(prec_cmip['SSP5_raw'], aws['prec'].dropna().astype(float), prec_cmip['SSP5_adjusted'],
+                            precip=True, starty=start_prec, endy=end_prec, target_label='Observed',
+                            scenario='SSP5', out_dir=output + 'Plots/', show=True, site=station)
+
+
+print('Figures for CMIP6 bias adjustment performance created.')
+
+# Close all open figures
+plt.close('all')
+
 # clean up function in the end to delete annual cmip files
+
