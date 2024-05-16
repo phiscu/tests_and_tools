@@ -38,11 +38,11 @@ gis_dir = output + 'GIS/'
 gis_file = gis_dir + 'station_gis.gpkg'
 if not os.path.exists(gis_dir):
     os.makedirs(gis_dir)
-buffered_stations = matilda_functions.create_buffer(station_coords, gis_file, buffer_radius=1000, write_files=True)
+buffered_stations = matilda_functions.create_buffer(station_coords, gis_file, buffer_radius=1000, write_files=False)
 
 ## Data checks and plots
 
-matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_raw.png')
+# matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_raw.png')
 
 # Remove temperature outliers
 matilda_functions.process_nested_dict(region_data, matilda_functions.remove_outliers, sd_factor=2)
@@ -51,7 +51,7 @@ matilda_functions.process_nested_dict(region_data, matilda_functions.remove_outl
 matilda_functions.process_nested_dict(region_data, matilda_functions.remove_annual_zeros)
 
 # Plot again
-matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_filtered.png')
+# matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_filtered.png')
 
 
 ######
@@ -74,7 +74,7 @@ cmip_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo/Kashkada
 
 aws = matilda_functions.search_dict(region_data, station)
 
-cmip6_station = matilda_functions.CMIP6DataProcessor(buffer_file, station, starty, endy, cmip_dir)
+# cmip6_station = matilda_functions.CMIP6DataProcessor(buffer_file, station, starty, endy, cmip_dir)
 
 # cmip6_station.download_cmip6_data()
 
@@ -96,15 +96,12 @@ prec_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/prec_' + station
 
 ## Plots
 
-matilda_functions.cmip_plot_combined(data=temp_cmip, target=aws, title='10y Mean of Air Temperature', target_label=station,
-                  filename='cmip6_temperature_bias_adjustment.png', out_dir=output + 'Plots/')
-matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws.dropna(), title='10y Mean of Monthly Precipitation', precip=True,
-                   target_label=station, intv_mean='10Y', filename='cmip6_precipitation_bias_adjustment.png', out_dir=output + 'Plots/')
+matilda_functions.cmip_plot_combined(data=temp_cmip, target=aws, title=f'"{station}" - 5y Rolling Mean of Annual Air Temperature', target_label='Observations',
+                  filename='cmip6_temperature_bias_adjustment.png',
+                                     intv_mean='Y', rolling=5, out_dir=output + 'Plots/')
+matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws.dropna(), title=f'"{station}" - 5y Rolling Mean of Annual Precipitation', precip=True,
+                   target_label='Observations', filename='cmip6_precipitation_bias_adjustment.png',
+                                     intv_sum='Y', rolling=5, out_dir=output + 'Plots/')
 print('Figures for CMIP6 bias adjustment created.')
 
-# ROLLING MEANS INSTEAD OF MULTIPLE RESAMPLING??
-
-# Change station label
-
-##
 # clean up function in the end to delete annual cmip files

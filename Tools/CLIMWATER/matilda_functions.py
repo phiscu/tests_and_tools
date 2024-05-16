@@ -872,43 +872,41 @@ def dict_to_pickle(dic, target_path):
 
 
 def cmip_plot(ax, df, target, title=None, precip=False, intv_sum='M', intv_mean='10Y',
-              target_label='Target', show_target_label=False):
+              target_label='Target', show_target_label=False, rolling=None):
     """Resamples and plots climate model and target data."""
-
     if intv_mean == '10Y' or intv_mean == '5Y' or intv_mean == '20Y':
         closure = 'left'
     else:
         closure = 'right'
-
     if not precip:
-        ax.plot(df.resample(intv_mean, closed=closure, label='left').mean().iloc[:, :], linewidth=1.2)
+        if rolling is not None:
+            ax.plot(df.resample(intv_mean, closed=closure, label='left').mean().iloc[:, :].rolling(rolling).mean(), linewidth=1.2)
+        else:
+            ax.plot(df.resample(intv_mean, closed=closure, label='left').mean().iloc[:, :], linewidth=1.2)
         era_plot, = ax.plot(target['temp'].resample(intv_mean).mean(), linewidth=1.5, c='red', label=target_label,
                             linestyle='dashed')
     else:
-        ax.plot(df.resample(intv_sum).sum().resample(intv_mean, closed=closure, label='left').mean().iloc[:, :],
-                linewidth=1.2)
-        era_plot, = ax.plot(target['prec'].resample(intv_sum).sum().resample(intv_mean).mean(), linewidth=1.5,
+        if rolling is not None:
+            ax.plot(df.resample(intv_sum, closed=closure, label='left').sum().iloc[:, :].rolling(rolling).mean(), linewidth=1.2)
+        else:
+            ax.plot(df.resample(intv_sum, closed=closure, label='left').sum().iloc[:, :], linewidth=1.2)
+        era_plot, = ax.plot(target['prec'].resample(intv_sum).sum(), linewidth=1.5,
                             c='red', label=target_label, linestyle='dashed')
     if show_target_label:
         ax.legend(handles=[era_plot], loc='upper left')
     ax.set_title(title)
     ax.grid(True)
 
-
 def cmip_plot_combined(data, target, title=None, precip=False, intv_sum='M', intv_mean='10Y',
-                       target_label='Target', show=False, filename=None, out_dir='./'):
+                       target_label='Target', show=False, filename=None, out_dir='./', rolling=None):
     """Combines multiple subplots of climate data in different scenarios before and after bias adjustment.
     Shows target data for comparison"""
-
     figure, axis = plt.subplots(2, 2, figsize=(12, 12), sharex="col", sharey="all")
-
-    t_kwargs = {'target': target, 'intv_mean': intv_mean, 'target_label': target_label}
+    t_kwargs = {'target': target, 'intv_mean': intv_mean, 'target_label': target_label, 'rolling': rolling}
     p_kwargs = {'target': target, 'intv_mean': intv_mean, 'target_label': target_label,
-                'intv_sum': intv_sum, 'precip': True}
-
+                'intv_sum': intv_sum, 'precip': True, 'rolling': rolling}
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-
     if not precip:
         cmip_plot(axis[0, 0], data['SSP2_raw'], show_target_label=True, title='SSP2 raw', **t_kwargs)
         cmip_plot(axis[0, 1], data['SSP2_adjusted'], title='SSP2 adjusted', **t_kwargs)
