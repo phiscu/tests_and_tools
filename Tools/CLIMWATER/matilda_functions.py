@@ -592,12 +592,13 @@ class CMIP6DataProcessor:
     None
     """
 
-    def __init__(self, buffer_file, station, starty, endy, cmip_dir):
+    def __init__(self, buffer_file, station, starty, endy, cmip_dir, processes):
         self.buffer_file = buffer_file
         self.station = station
         self.starty = starty
         self.endy = endy
         self.cmip_dir = cmip_dir
+        self.processes = processes
 
     def initialize_target(self):
         """
@@ -619,9 +620,11 @@ class CMIP6DataProcessor:
         """
         self.initialize_target()
 
-        downloader_t = CMIPDownloader(var='tas', starty=self.starty, endy=self.endy, shape=self.buffer_ee, processes=5, dir=self.cmip_dir)
+        downloader_t = CMIPDownloader(var='tas', starty=self.starty, endy=self.endy, shape=self.buffer_ee,
+                                      processes=self.processes, dir=self.cmip_dir)
         downloader_t.download()
-        downloader_p = CMIPDownloader(var='pr', starty=self.starty, endy=self.endy, shape=self.buffer_ee, processes=5, dir=self.cmip_dir)
+        downloader_p = CMIPDownloader(var='pr', starty=self.starty, endy=self.endy, shape=self.buffer_ee,
+                                      processes=self.processes, dir=self.cmip_dir)
         downloader_p.download()
 
     def process_cmip6_data(self):
@@ -1161,3 +1164,239 @@ def pp_matrix(original, target, corrected, scenario=None, nrow=7, ncol=5, precip
     if show:
         plt.show()
 
+
+def write_output(adj_dict: dict, output: str, station: str, starty: str, endy: str, type: str, ndigits: int=3):
+    """
+    Writes the full output of the adjusted dictionary to CSV files. Variable name is determined based on the mean value
+    of the first DataFrame.
+    Parameters
+    ----------
+    adj_dict : dict
+        A dictionary containing DataFrames to be processed.
+    output : str
+        Output directory path.
+    station : str
+        Station name for naming convention.
+    starty : str
+        Start year for naming convention.
+    endy : str
+        End year for naming convention.
+    type : str
+        Type of the file written. Usually 'full' or 'summary'.
+    ndigits : int
+        Number of digits the dataframes will be rounded to before writing them to file.
+    Returns
+    -------
+    None
+    """
+    if adj_dict['SSP2_raw'].mean().mean() > 100:
+        var = 'temp'
+    else:
+        var = 'prec'
+    final_output = f'{output}posterior/{type}/'
+    if not os.path.exists(final_output):
+        os.makedirs(final_output)
+    for name, data in adj_dict.items():
+        round(data, ndigits).to_csv(f'{final_output}{name}_{station}_{type}_{var}_{starty}-{endy}.csv')
+
+
+def ensemble_summary(df):
+    """
+    Calculate ensemble summary statistics for the input DataFrame.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame with ensemble member data.
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with ensemble summary statistics including mean, median, min, max, standard deviation,
+        and 90% confidence interval bounds.
+    """
+    summary_df = pd.DataFrame(index=df.index)
+    # Calculate ensemble mean
+    summary_df['ensemble_mean'] = df.mean(axis=1)
+    # Calculate ensemble median
+    summary_df['ensemble_median'] = df.median(axis=1)
+    # Calculate ensemble min
+    summary_df['ensemble_min'] = df.min(axis=1)
+    # Calculate ensemble max
+    summary_df['ensemble_max'] = df.max(axis=1)
+    # Calculate ensemble standard deviation
+    summary_df['ensemble_sd'] = df.std(axis=1)
+    # Calculate ensemble 90% confidence interval lower bound
+    summary_df['ensemble_90perc_CI_lower'] = df.quantile(0.05, axis=1)
+    # Calculate ensemble 90% confidence interval upper bound
+    summary_df['ensemble_90perc_CI_upper'] = df.quantile(0.95, axis=1)
+
+    return summary_df
+
+
+def summary_dict(results_dict: dict):
+    """
+    Generate a dictionary of ensemble summary DataFrames for each value in the input dictionary.
+    Parameters
+    ----------
+    results_dict : dict
+        Input dictionary containing ensemble results.
+    Returns
+    -------
+    dict
+        A summary dictionary with keys as original keys and values as ensemble summaries.
+    """
+    return {key: ensemble_summary(value) for key, value in results_dict.items()}
+
+
+class StationPreprocessor:
+    def __init__(self, input_dir, output_dir, buffer_radius=1000, show=True, sd_factor=2):
+        self.input_dir = input_dir
+        self.output_dir = output_dir
+        self.buffer_radius = buffer_radius
+        self.show = show
+        self.sd_factor = sd_factor
+        self.gis_dir = self.output_dir + 'GIS/'
+        self.gis_file = self.gis_dir + 'station_gis.gpkg'
+
+    def read_data_and_create_buffers(self):
+        self.region_data, self.station_coords = read_station_data(self.input_dir)
+        if not os.path.exists(self.gis_dir):
+            os.makedirs(self.gis_dir)
+        self.buffered_stations = create_buffer(self.station_coords, self.gis_file, buffer_radius=self.buffer_radius,
+                                                  write_files=True)
+
+    def data_checks_and_plots(self):
+        # Plots before filters
+        plot_region_data(self.region_data, show=self.show,
+                            output=self.output_dir + 'overview_plots/aws_data_raw.png')
+
+        # Remove temperature outliers
+        process_nested_dict(self.region_data, remove_outliers, sd_factor=self.sd_factor)
+
+        # Remove years with an annual precipitation of 0
+        process_nested_dict(self.region_data, remove_annual_zeros)
+
+        # Plot after filters
+        plot_region_data(self.region_data, show=self.show,
+                            output=self.output_dir + 'overview_plots/aws_data_filtered.png')
+
+    def full_preprocessing(self):
+        self.read_data_and_create_buffers()
+        self.data_checks_and_plots()
+
+
+class ClimateScenarios:
+    def __init__(self, output, region_data, station, buffer_file, download=False, load_backup=True, show=True,
+                 starty=1979, endy=2100, processes=5):
+        self.output = output
+        self.download = download
+        self.load_backup = load_backup
+        self.show = show
+        self.buffer_file = buffer_file
+        self.station = station
+        self.starty = starty
+        self.endy = endy
+        self.region_data = region_data
+        self.processes = processes
+        self.aws = search_dict(self.region_data, self.station)
+
+    def cmip6_data_processing(self):
+        cmip_dir = f'{self.output}raw/'
+        self.cmip6_station = CMIP6DataProcessor(self.buffer_file, self.station, self.starty, self.endy,
+                                                   cmip_dir, self.processes)
+        print(f'CMIP6DataProcessor instance for station "{self.station}" configured.')
+
+        if self.download:
+            self.cmip6_station.download_cmip6_data()
+
+        self.cmip6_station.bias_adjustment(self.region_data)
+        self.temp_cmip = self.cmip6_station.ssp_tas_dict
+        self.prec_cmip = self.cmip6_station.ssp_pr_dict
+
+    def data_checks(self):
+        self.temp_cmip, self.prec_cmip = apply_filters(self.temp_cmip, self.prec_cmip, zscore_threshold=3,
+                                                          jump_threshold=5, resampling_rate='Y')
+        print(f'Consistency-checks applied to adjusted data for "{self.station}".')
+
+        process_nested_dict(self.temp_cmip, round, ndigits=3)
+        process_nested_dict(self.prec_cmip, round, ndigits=3)
+        print(f'Data for "{self.station}" rounded to save storage space.')
+
+    def backup_files(self):
+        if not self.load_backup:
+            dict_to_pickle(self.temp_cmip, self.output + 'back_ups/temp_' + self.station + '_adjusted.pickle')
+            dict_to_pickle(self.prec_cmip, self.output + 'back_ups/prec_' + self.station + '_adjusted.pickle')
+        else:
+            self.temp_cmip = pickle_to_dict(self.output + 'back_ups/temp_' + self.station + '_adjusted.pickle')
+            self.prec_cmip = pickle_to_dict(self.output + 'back_ups/prec_' + self.station + '_adjusted.pickle')
+        print(f'Back-up of adjusted data for "{self.station}" written.')
+
+    def plots(self):
+        cmip_plot_combined(data=self.temp_cmip, target=self.aws,
+                              title=f'"{self.station}" - 5y Rolling Mean of Annual Air Temperature',
+                              target_label='Observations',
+                              filename=f'cmip6_bias_adjustment_{self.station}_temperature.png', show=self.show,
+                              intv_mean='Y', rolling=5, out_dir=self.output + 'Plots/')
+        cmip_plot_combined(data=self.prec_cmip, target=self.aws.dropna(),
+                              title=f'"{self.station}" - 5y Rolling Mean of Annual Precipitation', precip=True,
+                              target_label='Observations',
+                              filename=f'cmip6_bias_adjustment_{self.station}_precipitation.png', show=self.show,
+                              intv_sum='Y', rolling=5, out_dir=self.output + 'Plots/')
+        print(f'Figures for CMIP6 bias adjustment for "{self.station}" created.')
+
+        cmip_plot_ensemble(self.temp_cmip, self.aws['temp'], intv_mean='Y', show=self.show,
+                              out_dir=self.output + 'Plots/', target_label="Observations",
+                              filename=f'cmip6_ensemble_{self.station}', site_label=self.station)
+        cmip_plot_ensemble(self.prec_cmip, self.aws['prec'].dropna(), precip=True, intv_sum='Y', show=self.show,
+                              out_dir=self.output + 'Plots/', target_label="Observations", site_label=self.station,
+                              filename=f'cmip6_ensemble_{self.station}')
+        print(f'Figures for CMIP6 ensembles for "{self.station}" created.')
+
+        start_temp = self.aws['temp'].first_valid_index().year
+        end_temp = self.aws['temp'].last_valid_index().year
+        start_prec = self.aws['prec'].dropna().first_valid_index().year
+        end_prec = self.aws['prec'].dropna().last_valid_index().year
+
+        pp_matrix(self.temp_cmip['SSP2_raw'], self.aws['temp'], self.temp_cmip['SSP2_adjusted'], scenario='SSP2',
+                     starty=start_temp, endy=end_temp, target_label='Observed', out_dir=self.output + 'Plots/',
+                     show=self.show, site=self.station)
+        pp_matrix(self.temp_cmip['SSP5_raw'], self.aws['temp'], self.temp_cmip['SSP5_adjusted'], scenario='SSP5',
+                     starty=start_temp, endy=end_temp, target_label='Observed', out_dir=self.output + 'Plots/',
+                     show=self.show, site=self.station)
+
+        pp_matrix(self.prec_cmip['SSP2_raw'], self.aws['prec'].dropna().astype(float), self.prec_cmip['SSP2_adjusted'],
+                     precip=True, starty=start_prec, endy=end_prec, target_label='Observed', scenario='SSP2',
+                     out_dir=self.output + 'Plots/', show=self.show, site=self.station)
+        pp_matrix(self.prec_cmip['SSP5_raw'], self.aws['prec'].dropna().astype(float), self.prec_cmip['SSP5_adjusted'],
+                     precip=True, starty=start_prec, endy=end_prec, target_label='Observed', scenario='SSP5',
+                     out_dir=self.output + 'Plots/', show=self.show, site=self.station)
+        print(f'Figures for CMIP6 bias adjustment performance for "{self.station}" created.')
+
+        plt.close('all')
+
+    def write_output_files(self):
+        write_output(self.prec_cmip, self.output, self.station, self.starty, self.endy, type='full')
+        write_output(self.temp_cmip, self.output, self.station, self.starty, self.endy, type='full')
+
+        temp_summary = summary_dict(self.temp_cmip)
+        prec_summary = summary_dict(self.prec_cmip)
+        write_output(temp_summary, self.output, self.station, self.starty, self.endy, type='summary')
+        write_output(prec_summary, self.output, self.station, self.starty, self.endy, type='summary')
+        print(f'Output files for "{self.station}" written.')
+
+    def complete_workflow(self):
+        self.cmip6_data_processing()
+        self.data_checks()
+        self.backup_files()
+        self.plots()
+        self.write_output_files()
+        print(f'Finished workflow for station "{self.station}".\n--------------------------------------')
+
+
+def count_dataframes(dictionary):
+    count = 0
+    for value in dictionary.values():
+        if isinstance(value, dict):
+            count += count_dataframes(value)
+        elif isinstance(value, pd.DataFrame):  # Assuming pandas DataFrame
+            count += 1
+    return count

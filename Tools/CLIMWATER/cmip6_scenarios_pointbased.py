@@ -1,146 +1,83 @@
 # -*- coding: UTF-8 -*-
 
-## import
 import os
-import pandas as pd
-import geopandas as gpd
-from shapely.geometry import Point, Polygon
-from shapely.ops import transform
-from functools import partial
-import pyproj
-import numpy as np
+import time
 import warnings
-from shapely.errors import ShapelyDeprecationWarning
-import geopandas as gpd
-import ee
-import geemap
-import utm
-from pyproj import CRS
 import sys
+from shapely.errors import ShapelyDeprecationWarning
 wd = os.getcwd()
 sys.path.append(wd + '/tests_and_tools/Tools/CLIMWATER')
-import matilda_functions
-import geopandas as gpd
-from shapely.geometry import Point
-import utm
-import matplotlib.pyplot as plt
+import matilda_functions as mf
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
+warnings.filterwarnings("ignore")
 
-# Paths
-directory_path = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo'
-output = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/CMIP6/'
+## Settings
+input_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo'
+output_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/CMIP6/'
+buffer_radius = 2000
+show = True
+sd_factor = 2
+processes = 30
+download = True
+load_backup = False
 
-# Read data
-region_data, station_coords = matilda_functions.read_station_data(directory_path)
+start_region_index = 0   # 0 if you want to start with the very first station
+start_station_index = 0  # 0 if you want to start with the very first station
 
-# Create buffers around station coordinates and save them to a GeoPackage file
-gis_dir = output + 'GIS/'
-gis_file = gis_dir + 'station_gis.gpkg'
-if not os.path.exists(gis_dir):
-    os.makedirs(gis_dir)
-buffered_stations = matilda_functions.create_buffer(station_coords, gis_file, buffer_radius=1000, write_files=False)
+## Preprocessing
+print('Initiating preprocessing routine')
+preprocessor = mf.StationPreprocessor(input_dir=input_dir, output_dir=output_dir, buffer_radius=buffer_radius,
+                                      show=show, sd_factor=sd_factor)
+preprocessor.full_preprocessing()
+print('Set up preprocessing routine for target directory!')
 
-## Data checks and plots
+## Main loop
 
-# matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_raw.png')
+start_total_time = time.time()
+total = mf.count_dataframes(preprocessor.region_data)
 
-# Remove temperature outliers
-matilda_functions.process_nested_dict(region_data, matilda_functions.remove_outliers, sd_factor=2)
+for region_index, region in enumerate(preprocessor.region_data.keys()):
+    # If start_region_index is set and we haven't reached it yet, continue to the next region
+    if start_region_index is not None and region_index < start_region_index:
+        continue
 
-# Remove years with an annual precipitation of 0
-matilda_functions.process_nested_dict(region_data, matilda_functions.remove_annual_zeros)
+    for station_index, (station, data) in enumerate(preprocessor.region_data[region].items()):
+        # If start_station_index is set and we haven't reached it yet, continue to the next station
+        if start_station_index is not None and station_index < start_station_index:
+            continue
 
-# Plot again
-# matilda_functions.plot_region_data(region_data, show=True, output=output + 'Plots/aws_data_filtered.png')
+        start_process_time = time.time()
+        if region_index == 0:
+            print(f'\n** Starting processing of Station {station_index+1} of {total}: "{station}"\n')
+        else:
+            print(f'\n** Starting processing of Station {station_index+6} of {total}: "{station}"\n')
 
+        try:
+            instance = mf.ClimateScenarios(output=f'{preprocessor.output_dir}{region}/{station}/',
+                                           region_data=preprocessor.region_data, station=station, download=download,
+                                           load_backup=load_backup, show=show, buffer_file=preprocessor.gis_file,
+                                           processes=processes)
+            instance.complete_workflow()
+        except Exception as e:
+            print(f"Error occurred for station {station}: {e}")
+            continue  # Skip to the next station
 
-######
-# Projection class (input: )
+        end_process_time = time.time()
+        process_elapsed_time = end_process_time - start_process_time
+        print(f'Processing time for station {station}: {round(process_elapsed_time/60, 2)} minutes')
 
-# Download CMIP6 for buffers
-# Bias adjust CMIP6 with station data
-# Store data
-# Plot data
+    # Update the start_station_index after processing all stations in the current region
+    start_station_index = None
 
+    # If start_region_index is not set, update it to proceed to the next region
+    if start_region_index is None:
+        start_region_index = region_index
 
-## GEE
+# Reset the start_region_index after completing the loop
+start_region_index = None
 
-# Example
-buffer_file = gis_file
-station = 'Karshi'
-starty = 1979
-endy = 2100
-cmip_dir = '/home/phillip/Seafile/CLIMWATER/Data/Hydrometeorology/Meteo/Kashkadarya/cmip6/'
-
-aws = matilda_functions.search_dict(region_data, station)
-
-# cmip6_station = matilda_functions.CMIP6DataProcessor(buffer_file, station, starty, endy, cmip_dir)
-
-# cmip6_station.download_cmip6_data()
-
-# cmip6_station.bias_adjustment(region_data)
-# temp_cmip = cmip6_station.ssp_tas_dict
-# prec_cmip = cmip6_station.ssp_pr_dict
-
-## Data checks
-
-# temp_cmip, prec_cmip = matilda_functions.apply_filters(temp_cmip, prec_cmip, zscore_threshold=3, jump_threshold=5, resampling_rate='Y')
-
-## Back-up files
-
-# matilda_functions.dict_to_pickle(temp_cmip, output + 'adjusted/temp_' + station + '_adjusted.pickle')
-# matilda_functions.dict_to_pickle(prec_cmip, output + 'adjusted/prec_' + station + '_adjusted.pickle')
-
-temp_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/temp_' + station + '_adjusted.pickle')
-prec_cmip = matilda_functions.pickle_to_dict(output + 'adjusted/prec_' + station + '_adjusted.pickle')
-
-## Plots
-# Lineplots with all models
-matilda_functions.cmip_plot_combined(data=temp_cmip, target=aws,
-                                     title=f'"{station}" - 5y Rolling Mean of Annual Air Temperature', target_label='Observations',
-                  filename=f'cmip6_bias_adjustment_{station}_temperature.png', show=True,
-                                     intv_mean='Y', rolling=5, out_dir=output + 'Plots/')
-matilda_functions.cmip_plot_combined(data=prec_cmip, target=aws.dropna(),
-                                     title=f'"{station}" - 5y Rolling Mean of Annual Precipitation', precip=True,
-                   target_label='Observations', filename=f'cmip6_bias_adjustment_{station}_precipitation.png', show=True,
-                                     intv_sum='Y', rolling=5, out_dir=output + 'Plots/')
-print('Figures for CMIP6 bias adjustment created.')
-
-# Ensemble mean plots
-matilda_functions.cmip_plot_ensemble(temp_cmip, aws['temp'], intv_mean='Y', show=True, out_dir=output + 'Plots/',
-                                     target_label="Observations", filename=f'cmip6_ensemble_{station}',
-                                     site_label=station)
-matilda_functions.cmip_plot_ensemble(prec_cmip, aws['prec'].dropna(), precip=True, intv_sum='Y',
-                                     show=True, out_dir=output + 'Plots/', target_label="Observations",
-                                     site_label=station, filename=f'cmip6_ensemble_{station}')
-print('Figures for CMIP6 ensembles created.')
-
-## Probability plots:
-
-start_temp = aws['temp'].first_valid_index().year
-end_temp = aws['temp'].last_valid_index().year
-start_prec = aws['prec'].dropna().first_valid_index().year
-end_prec = aws['prec'].dropna().last_valid_index().year
-
-matilda_functions.pp_matrix(temp_cmip['SSP2_raw'], aws['temp'], temp_cmip['SSP2_adjusted'], scenario='SSP2',
-                            starty=start_temp, endy=end_temp, target_label='Observed',
-                            out_dir=output + 'Plots/', show=True, site=station)
-matilda_functions.pp_matrix(temp_cmip['SSP5_raw'], aws['temp'], temp_cmip['SSP5_adjusted'], scenario='SSP5',
-                            starty=start_temp, endy=end_temp, target_label='Observed',
-                            out_dir=output + 'Plots/', show=True, site=station)
-
-matilda_functions.pp_matrix(prec_cmip['SSP2_raw'], aws['prec'].dropna().astype(float), prec_cmip['SSP2_adjusted'],
-                            precip=True, starty=start_prec, endy=end_prec, target_label='Observed',
-                            scenario='SSP2', out_dir=output + 'Plots/', show=True, site=station)
-matilda_functions.pp_matrix(prec_cmip['SSP5_raw'], aws['prec'].dropna().astype(float), prec_cmip['SSP5_adjusted'],
-                            precip=True, starty=start_prec, endy=end_prec, target_label='Observed',
-                            scenario='SSP5', out_dir=output + 'Plots/', show=True, site=station)
-
-
-print('Figures for CMIP6 bias adjustment performance created.')
-
-# Close all open figures
-plt.close('all')
-
-# clean up function in the end to delete annual cmip files
+end_total_time = time.time()
+total_elapsed_time = end_total_time - start_total_time
+print('**************************************\n** COMPLETED **')
+print(f'Total processing time: {round(total_elapsed_time/60, 2)} minutes')
 
