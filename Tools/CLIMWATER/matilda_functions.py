@@ -1,41 +1,25 @@
-import ee
-import geemap
-import configparser
-import ast
-import geopandas as gpd
 import concurrent.futures
 import os
 import requests
 from retry import retry
 from tqdm import tqdm
 from bias_correction import BiasCorrection
-import matplotlib.pyplot as plt
-import plotly.express as px
-import seaborn as sns
-import matplotlib.pyplot as plt
-import warnings
 import seaborn as sns
 from matplotlib.legend import Legend
 import probscale
 import matplotlib.pyplot as plt
-import sys
 import pandas as pd
-import geopandas as gpd
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point
 from shapely.ops import transform
-from functools import partial
 import pyproj
 import numpy as np
 import warnings
-from shapely.errors import ShapelyDeprecationWarning
 import geopandas as gpd
 import ee
 import geemap
-import utm
-from pyproj import CRS
 import pickle
 
-warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
+warnings.filterwarnings("ignore")
 
 
 def read_station_data(directory_path):

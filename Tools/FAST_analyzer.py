@@ -24,23 +24,14 @@ pio.renderers.default = "browser"
 
 fast_path = '/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/FAST/'
 
-# step1 = fast_path + 'FAST_Paper_1_fix_lrtemp-PCORR-CET'
-# step2 = fast_path + 'FAST_Paper_2_fix_lrtemp-PCORR-CET-SFCF-lrprec-TT_snow-TT_diff-RFS'
-# step3 = fast_path + 'FAST_Paper_3_fix_lrtemp-PCORR-CET-SFCF-lrprec-TT_snow-TT_diff-RFS-CFMAXice_CFMAXrel'
+step1 = fast_path + 'glacier_cover/FAST_Paper_1_internal_SWE_targetMB430_1500012_glacarea0'
+step2 = fast_path + 'glacier_cover/FAST_Paper_1_snow_cal_no-fix_targetMB430_targetSWE_1500009'
+step3 = fast_path + 'glacier_cover/FAST_Paper_1_internal_SWE_targetMB430_1500012_glacarea30'
+step4 = fast_path + 'glacier_cover/FAST_Paper_1_internal_SWE_targetMB430_1500012_glacarea50'
+step5 = fast_path + 'glacier_cover/FAST_Paper_1_snow_cal_param-fix-SCFC-CET_PCORR-0-58_targetMB430_targetSWE_1500012'
 
-# step1 = fast_path + 'FAST_Paper_1_no-fix'
-# step2 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-1_38034'
-# step2 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-1_228204'
-# step3 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-0-6_228204'
-# step4 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-0-48_114102'
+step1 = '/home/phillip/Seafile/CLIMWATER/YSS/2024/Pskem_data/Calibration/FAST_Pskem_Cal_Step2-FAST-internal.csv'
 
-step1 = fast_path + 'FAST_Paper_1_param-fix-SCFC-CET_PCORR-0-64_lr_templim55-65_targetMB430_2000016'
-
-
-# step1 = fast_path + 'FAST_Paper_4_fix_lrtemp-PCORR-CET_glacarea50'
-# step2 = fast_path + 'FAST_Paper_5_fix_lrtemp-PCORR-CET_glacarea30'
-# step3 = fast_path + 'FAST_Paper_1_fix_lrtemp-PCORR-CET'
-# step4 = fast_path + 'FAST_Paper_6_fix_lrtemp-PCORR-CET_glacarea0'
 
 ##
 def fast_iter(param, interf=4, freqst=2):
@@ -99,7 +90,9 @@ def get_si(fast_results: str, to_csv: bool = False) -> pd.DataFrame:
     return sens
 
 
-def plot_sensitivity_bars(*dfs, labels=None, show=False, bar_width=0.2, bar_gap=0.7, threshold=0.05):
+def plot_sensitivity_bars(*dfs, labels=None, show=False, bar_width=0.2, bar_gap=0.7, threshold=0.05,
+                          legend_title='Catchment Glacier Cover',
+                          custom_order=None):
     """
     Plots a horizontal bar chart showing the total sensitivity index for each parameter in a MATILDA model.
     Parameters
@@ -117,7 +110,7 @@ def plot_sensitivity_bars(*dfs, labels=None, show=False, bar_width=0.2, bar_gap=
         Sensitivity threshold value to be displayed as dashed vertical line.
     """
     traces = []
-    colors = ['darkblue', 'orange', 'purple', 'cyan']  # add more colors if needed
+    colors = ['darkblue', 'orange', 'lime', 'purple', 'darkcyan']  # add more colors if needed
     param_no = []
     for i, df in enumerate(dfs):
         df = get_si(df)
@@ -129,12 +122,14 @@ def plot_sensitivity_bars(*dfs, labels=None, show=False, bar_width=0.2, bar_gap=
             else:
                 label = labels[i]
         else:
-            if labels is not None:
+            if labels is None:
                 label = 'No Limits'
             else:
                 label = labels[i]
+        if custom_order is not None:
+            df = df.reindex(custom_order[::-1])     # for some reason .reindex() reverses the order
         trace = go.Bar(y=df.index,
-                       x=df['ST']-df['S1'],
+                       x=df['ST'],
                        name=label,
                        orientation='h',
                        marker=dict(color=colors[i]),
@@ -148,37 +143,44 @@ def plot_sensitivity_bars(*dfs, labels=None, show=False, bar_width=0.2, bar_gap=
     # Add dashed horizontal line at the threshold value
     layout = go.Layout(shapes=[dict(type='line', x0=threshold, x1=threshold, y0=-0.5, y1=max_len,
                                     line=dict(color='darkgrey', width=2, dash='dash'))],
-    title = dict(text='<b>' + 'Total Sensitivity Index for MATILDA Parameters' + '<b>', font=dict(size=24)),
-    xaxis_title = 'Total Sensitivity Index',
+    title = dict(text='<b>' + 'Sensitivity Assessment for MATILDA Parameters' + '<b>', font=dict(size=24)),
+    xaxis_title = 'Total Order Sensitivity Index',
     yaxis_title = 'Parameter',
     bargap = bar_gap,
-    font = dict(size=20),
-    showlegend=True)
+    font = dict(size=20, family='Palatino'),
+    showlegend=True,
+    legend_title_text=legend_title,
+    legend_title_font=dict(size=18, family='Palatino'))
 
     fig = go.Figure(data=traces, layout=layout)
     if show:
         fig.show()
 
 
+
 ##
+plot_sensitivity_bars(step4, step3, step5, step2, step1,
+                      labels=['50%', '30%', '10.8% (internal only)', '10.8% (all)', '0%'],
+                      bar_width=0.25,
+                      bar_gap=0.25,
+                      show=True,
+                      custom_order=['SFCF', 'CET', 'PCORR', 'lr_temp', 'lr_prec', 'RFS', 'TT_snow', 'TT_diff',
+                                        'CFMAX_snow', 'CFMAX_rel', 'CWH', 'AG', 'BETA', 'FC', 'LP', 'K0', 'K1',
+                                        'K2', 'PERC', 'UZL', 'MAXBAS'])
+
 # plot_sensitivity_bars(step1, step2, step3, step4,
-#                       labels=['Glacier cover 50%', 'Glacier cover 30%', 'Glacier cover 10%', 'Glacier cover 0%'],
+#                       labels=['No constraints', 'Internal (Prec 100%)', 'Internal (Prec 60%)', 'Internal (Prec 48%)'],
 #                       bar_width=0.2,
 #                       bar_gap=0.3,
 #                       show=True)
 
-plot_sensitivity_bars(step1, step2, step3, step4,
-                      labels=['No constraints', 'Internal (Prec 100%)', 'Internal (Prec 60%)', 'Internal (Prec 48%)'],
-                      bar_width=0.2,
-                      bar_gap=0.3,
-                      show=True)
-
-si_df = get_si(step3)
+##
+si_df = get_si(step5)
 sensitive = si_df.index[si_df['ST'] > 0.05].values
 insensitive = si_df.index[si_df['ST'] < 0.05].values
 
-print('Parameters with a sensitivity index > 0.05:\n\n')
-[print(i) for i in sensitive]
+print('Parameters with a sensitivity index < 0.05:\n\n')
+[print(i) for i in insensitive]
 
 no_lim_interactions = no_lim_scores.ST - no_lim_scores.S1
 
@@ -224,13 +226,14 @@ print('Parameters with a sensitivity index > 0.05:\n\n')
 [print(i) for i in sensitive5]
 
 plot_sensitivity_bars(step1,
-                      labels=['PCORR, SFCF, CET fixed'],
+                      labels=['Internal Parameters'],
+                      legend_title='',
                       bar_width=0.2,
                       bar_gap=0.3,
                       show=True)
 
-sensitive6 = si_df.index[si_df['ST'] > 0.061].values
-insensitive6 = si_df.index[si_df['ST'] < 0.061].values
+sensitive6 = si_df.index[si_df['ST'] > 0.05].values
+insensitive6 = si_df.index[si_df['ST'] < 0.05].values
 
 # FAST005: ['lr_temp', 'lr_prec', 'K0', 'LP', 'MAXBAS', 'TT_diff', 'AG', 'RFS']
 # FAST007: ['lr_temp', 'lr_prec', 'BETA', 'K0', 'LP', 'MAXBAS', 'TT_diff', 'CFMAX_rel', 'AG', 'RFS']

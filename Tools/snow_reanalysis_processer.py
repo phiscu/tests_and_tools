@@ -70,30 +70,42 @@ def swe_means(tif_dir, start_year=1999, end_year=2016):
 
 
 ## Get SWE means from dir
-tif_dir = "/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/hmadsr/processed_final"
+tif_dir = "/home/phillip/Seafile/CLIMWATER/YSS/2024/Pskem_data/swe"
 
 swe_df = swe_means(tif_dir, end_year=2016)
-swe_df.to_csv("/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/hmadsr/kyzylsuu_swe.csv")
+swe_df.to_csv("/home/phillip/Seafile/CLIMWATER/YSS/2024/Pskem_data/swe/kyzylsuu_swe.csv")
 
 
 ## Scaling factor
 # Glacier mask coarser than outline shapes
-mask99 = geotiff2xr('/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/input/kyzylsuu/met/hmadsr/test_files/processed/HMA_SR_D_v01_WY1999_MASK_kyzylsuu.tif')
+mask99 = geotiff2xr('/home/phillip/Seafile/CLIMWATER/YSS/2024/Pskem_data/swe/HMA_SR_D_v01_WY1999_MASK_pskem.tif')
 valid_pixels = mask99.where(mask99 != -999)
 total_valid_pixels = valid_pixels.count()
 swe_pixels = (valid_pixels == 0).sum()
 swe_frac = swe_pixels / total_valid_pixels
 # --> 82.8% vs. 89.2% in MATILDA
+# --> 93.4% vs. 96.8% MATILDA (Pskem)
 
-swe_area_sim = 0.892        # from catchment settings
+swe_area_sim = 0.968        # from catchment settings
 swe_area_obs = swe_frac.values
 sf = swe_area_obs / swe_area_sim
 print('SWE scaling factor: ' + str(round(sf, 3)))
 
+
+##
+mask_tif = select_tif(tif_dir, str(2015), "MASK")
+swe_tif = select_tif(tif_dir, str(2015), "SWE")
+
+mask = geotiff2xr(mask_tif[0])
+swe = geotiff2xr(swe_tif[0])
+
+masked_swe = swe.where(mask == 0)
+
+
 ## Plot SWE
 plt.figure(figsize=(12, 6))
 plt.plot(swe_df, color='b', linestyle='-')
-plt.title('Mean Catchment SWE (Kyzylsuu)')
+plt.title('Mean Catchment SWE (Pskem)')
 plt.xlabel('Year')
 plt.ylabel('Mean SWE')
 plt.grid(True)
@@ -103,28 +115,65 @@ plt.legend()
 plt.show()
 
 
-# ## Plot SWE
-#
-# da_cleaned = da.where(da != -999, np.nan)
-# day_to_plot = 200
-# day_data_cleaned = da_cleaned.sel(day=day_to_plot)
-# day_data_cleaned.plot.imshow(cmap="viridis", add_colorbar=True)
-# plt.title(f"Plot for Day {day_to_plot}")
-# plt.show()
-#
-# ## Plot mask
-#
-# da_cleaned = ma.where(ma != -999, np.nan)
-# da_cleaned = da_cleaned.sel(Non_seasonal_snow=1)
-# da_cleaned.plot.imshow(cmap="viridis", add_colorbar=True)
-# plt.show()
-# ## Plot masked SWE
-# selection = masked_data.sel(Non_seasonal_snow=1, day=1)
-# selection.plot.imshow(cmap="viridis", add_colorbar=True)
-# plt.title("Masked Data")
-# plt.xlabel("X")
-# plt.ylabel("Y")
-# plt.show()
+## Plot masked SWE
+selection = masked_swe.sel(Non_seasonal_snow=1, day=100)
+da_cleaned = mask.where(mask != -999, np.nan)
+da_cleaned = da_cleaned.sel(Non_seasonal_snow=1)
+
+# Plot the data
+fig, ax = plt.subplots(figsize=(5, 4), dpi=60)
+da_cleaned.plot.imshow(ax=ax, cmap="Spectral_r", add_colorbar=False)
+im = selection.plot.imshow(ax=ax, cmap="viridis", add_colorbar=True, vmin=0, vmax=3.3)
+plt.title("Masked Data")
+plt.xlabel("X")
+plt.ylabel("Y")
+plt.show()
 
 
+## Create gif
 
+import matplotlib.pyplot as plt
+import numpy as np
+import imageio
+import os
+import shutil
+
+# Assuming masked_swe and mask are already defined
+da_cleaned = mask.where(mask != -999, np.nan)
+da_cleaned = da_cleaned.sel(Non_seasonal_snow=1)
+
+# Specify the target directory
+target_dir = '/home/phillip/Seafile/CLIMWATER/YSS/2024/Slides/figs'
+frames_dir = os.path.join(target_dir, 'frames')
+
+# Create directories to store the frames and GIF
+os.makedirs(frames_dir, exist_ok=True)
+
+# Generate the plots and save them as frames
+for day in range(1, 367):
+    selection = masked_swe.sel(Non_seasonal_snow=1, day=day)
+
+    fig, ax = plt.subplots(figsize=(5, 4), dpi=60)
+    da_cleaned.plot.imshow(ax=ax, cmap="Spectral_r", add_colorbar=False)
+    im = selection.plot.imshow(ax=ax, cmap="viridis", add_colorbar=True, vmin=0, vmax=3.3)
+    plt.title(f"SWE in Pskem Catchment (HY 2015) - Day {day}")
+    plt.xlabel("X")
+    plt.ylabel("Y")
+
+    # Save the frame
+    frame_filename = os.path.join(frames_dir, f'frame_{day:03d}.png')
+    plt.savefig(frame_filename)
+    plt.close(fig)
+
+# Create the GIF
+gif_path = os.path.join(target_dir, 'masked_swe_animation.gif')
+with imageio.get_writer(gif_path, mode='I', duration=0.1) as writer:
+    for day in range(1, 367):
+        frame_filename = os.path.join(frames_dir, f'frame_{day:03d}.png')
+        image = imageio.imread(frame_filename)
+        writer.append_data(image)
+
+# Cleanup the frames directory
+shutil.rmtree(frames_dir)
+
+print(f"GIF saved to {gif_path}")

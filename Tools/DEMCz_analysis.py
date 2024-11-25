@@ -31,6 +31,11 @@ sys.path.append(home + '/Ana-Lena_Phillip/data/tests_and_tools/Tools')
 sys.path.append(home + '/EBA-CA/Repositories/matilda_edu/tools')
 from matilda_resampler import MatildaBulkSampler, doy_col, extract_resamples
 from helpers import dict_to_pickle, pickle_to_dict, write_yaml, read_yaml
+import matplotlib.font_manager as fm
+path_to_palatinottf = '/home/phillip/Downloads/Palatino.ttf'
+fm.fontManager.addfont(path_to_palatinottf)
+
+
 pio.renderers.default = "browser"
 
 data_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/parameters/'
@@ -50,12 +55,16 @@ data_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/parameters/'
 # data = pd.read_csv(data_path + 'SWE/' + 'DEMCz_Paper_1_SWE-Final_Step3_pareto-bounds_conlim-08_thin-1_burnIn500_400k_chains10_loglikeKGE_2000-2017.csv')
 data = pd.read_csv(
     '/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/parameters/SWE/DEMCz_Paper_1_SnowCal-update_Step3_conlim-08_thin-1_burnIn500_400k_chains10_loglikeKGE_2000-2017.csv')
+# data = pd.read_csv(
+# '/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/parameters/SWE/DEMCz_Paper_1_SnowCal-update_Step3_conlim-08_thin-1_burnIn500_400k_chains8_loglikeKGE_2000-2017.csv')
 
 ## Filters
 
 data = data[data['like1'] > 800]            # 700 =~0.85    max. 895 =~0.87
 data = data[data['like2'] < 50]
 # data = data.tail(100)
+
+print(min(data['parCFMAX_rel']), max(data['parCFMAX_rel']))
 
 ## Posterior distribution
 
@@ -142,6 +151,13 @@ for index, row in data.iterrows():
 for p in param_list:
     p.update(fix_val)
 
+
+##
+# fix_more = {'LP': 0.7, 'MAXBAS': 3.0}
+#
+# parameters.update(fix_more)
+
+
 ## MATILDA:
 
 data_path = '/home/phillip/Seafile/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/notebook_example_for_spot/'
@@ -167,7 +183,8 @@ settings = {
     'elev_rescaling': True,
     'freq': 'D',
     'lat': 42.18280043250193,
-    'glacier_profile': glacier_profile
+    'glacier_profile': glacier_profile,
+    'plot_type': 'all'
 }
 
 # fix_val = {'PCORR': 0.64, 'SFCF': 1, 'CET': 0}
@@ -214,6 +231,23 @@ fix_val = {
 # Great KGE (0.85), great in diffMB=-0.02; great fit for validation period (0.8); little systematical shift in spring and autumn, weird peak in early summer
 # parameters = {'BETA': 1.0345612, 'FC': 212.69034, 'K1': 0.025412053, 'K2': 0.0049677053, 'PERC': 2.1586323, 'UZL': 392.962, 'TT_snow': -1.4604422, 'CFMAX_ice': 5.3250813, 'CWH': 0.1916532}
 
+parameters = {
+    'BETA': 1.06986,
+    'FC': 429.672,
+    'K0': 0.167255,
+    'K1': 0.0126635,
+    'K2': 0.0972067,
+    'LP': 0.918489,
+    'MAXBAS': 2.9504,
+    'PERC': 0.559362,
+    'UZL': 359.547,
+    'CFMAX_rel': 1.4054,
+    'CWH': 0.0202685,
+    'AG': 0.763657
+}
+
+
+
 # parameters = {    "FC": 93.4912,
 #     "K1": 0.0123915,
 #     "K2": 0.0568295,
@@ -222,25 +256,84 @@ fix_val = {
 #     "CWH": 0.0169412,
 #     "AG": 0.532519
 # }
-
-results = matilda_simulation(**full_period, **settings, **parameters, **fix_val)
+##
+results = matilda_simulation(**calibration_period, **settings, **parameters, **fix_val)
 
 results[7].show()
 
-# Compare mass balances
+# results[10].write_html('/home/phillip/Seafile/CLIMWATER/YSS/2024/Slides/figs/matilda_calib_annual_kyzylsuu.html')
+
+# print(results[5].iloc[:, -3:])
+
+## Compare mass balances
+
 barandun = [-0.427142857142857, -0.171428571428571, -0.0957142857142857, -0.39, -0.0242857142857143, 0.07, -0.11,
             -0.0171428571428571, -0.105714285714286, 0.00714285714285714, 0.141428571428571, -0.194285714285714, -1.87
     , -0.0485714285714286, -1.21, -0.385714285714286, -1.32, -0.972857142857143, -0.977142857142857, np.NaN, np.NaN]
 wgms = [np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN,
         -950, -880, -390, -1120, -810, -540, -240]
 
-mass_balances = pd.DataFrame({'matilda_mb': results[5]['smb_water_year'][1:, ] / 1000,
-                              'barandun_mb': barandun,
-                              'Kara-Batkak_wgms_mb': [x / 1000 for x in wgms]})
-print(mass_balances.head(-2).mean())
+
+mass_balances = pd.DataFrame({'Simulation': results[5]['smb_water_year'][1:, ] / 1000,
+                              'Barandun et.al.': barandun,
+                              'WGMS (Karabatkak)': [x / 1000 for x in wgms]})
+print(mass_balances.head(-3).mean())
 print('diffMB:' + str(round(mass_balances.mean()[0] - mass_balances.mean()[1], 2)))
-mass_balances.plot()
-plt.ylim(-2, 0.7)
+
+# Define accessible colors
+colors = {
+    'Simulation': '#0072B2',    # Blue
+    'Barandun et.al.': '#D55E00',  # Orange
+    'WGMS (Karabatkak)': '#009E73'  # Green
+}
+
+ax = mass_balances.plot(color=[colors['Simulation'], colors['Barandun et.al.'], colors['WGMS (Karabatkak)']])
+plt.ylim(-2, 0.5)
+
+# Add horizontal lines and shaded areas for mean values and uncertainties
+shean_mean = -0.156
+shean_unc = 0.324
+miles_mean = -0.379
+miles_std = 0.19
+
+# Shean et al. (mean and uncertainty)
+plt.axhline(y=shean_mean, color='#CC79A7', linestyle='-', label='Shean et.al. (mean)')  # Pink
+plt.fill_between(
+    x=mass_balances.index,
+    y1=shean_mean - shean_unc,
+    y2=shean_mean + shean_unc,
+    color='#CC79A7',
+    alpha=0.2,
+    label='Shean et.al. (uncertainty)'
+)
+
+# Miles et al. (mean and uncertainty)
+plt.axhline(y=miles_mean, color='#E69F00', linestyle='-', label='Miles et.al. (mean)')  # Yellow
+plt.fill_between(
+    x=mass_balances.index,
+    y1=miles_mean - miles_std,
+    y2=miles_mean + miles_std,
+    color='#E69F00',
+    alpha=0.2,
+    label='Miles et.al. (std)'
+)
+
+plt.ylabel('m w.e.')
+plt.xlabel('Year')
+
+# Function to format the y-axis tick labels
+def y_format(tick_val, pos):
+    if tick_val == 0:
+        return '0'
+    elif tick_val > 0:
+        return '{:.1f}'.format(tick_val)
+    else:
+        return '{:.1f}'.format(tick_val)
+
+# Apply the formatter to the y-axis
+ax.yaxis.set_major_formatter(FuncFormatter(y_format))
+
+plt.legend()
 plt.show()
 
 ## Compare SWE:
@@ -277,6 +370,8 @@ plt.show()
 swe_df_monthly[['SWE_obs', 'SWE_sim']].plot()
 plt.show()
 
+##
+results[5]
 
 ## Annual cycle
 swe_df = doy_col(swe_df)
@@ -291,15 +386,17 @@ swe_df_annual_cycle = swe_df.groupby('DOY').agg({
     'snow_melt': 'mean',
     'snow_fall': 'mean'
 })
+# Truncate to 365 days
+swe_df_annual_cycle = swe_df_annual_cycle[:-1]
 
 # Create a plot for the average annual cycle
 plt.figure(figsize=(12, 6))
-plt.plot(swe_df_annual_cycle.index, swe_df_annual_cycle['SWE_obs'], label='obsserved', linestyle='-')
+plt.plot(swe_df_annual_cycle.index, swe_df_annual_cycle['SWE_obs'], label='observed', linestyle='-')
 plt.plot(swe_df_annual_cycle.index, swe_df_annual_cycle['SWE_sim'], label='simulated', linestyle='-')
 
 plt.xlabel('Day of the Year')
 plt.ylabel('mm')
-plt.title('Average Annual Cycle of observed and simulated SWE')
+plt.title('Average Annual Cycle of Observed and Simulated SWE')
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -330,7 +427,6 @@ settings_resample = {
 matilda_resamples = pickle_to_dict(home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/parameters/SWE/parameter_sets_final/DEMCz_SnowCal-update_Step3_chains10_loglikeKGE_2000-2017_top64.pickle')
 summary = extract_resamples(matilda_resamples)
 
-##
 ## Pareto front
 
 target_MB = -0.43
@@ -379,3 +475,9 @@ final = summary.loc[summary["season_ranks"] < 2, 'Parameters'].squeeze()
 ## Run final set
 results = matilda_simulation(**full_period, **settings, **final)
 results[7].show()
+
+
+## Water balance
+
+balance = results[0]['total_precipitation'].resample('Y').sum() + results[0]['ice_melt_on_glaciers'].resample('Y').sum() - results[0]['actual_evaporation'].resample('Y').sum() - results[0]['total_runoff'].resample('Y').sum()
+balance.sum()

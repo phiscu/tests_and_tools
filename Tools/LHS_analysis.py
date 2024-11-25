@@ -18,6 +18,8 @@ else:
     home = str(Path.home()) + '/Seafile'
 
 pio.renderers.default = "browser"
+plt.rcParams["font.family"] = "Palatino"
+
 
 data_path = home + '/EBA-CA/Papers/No1_Kysylsuu_Bash-Kaingdy/data/parameters/'
 
@@ -38,8 +40,8 @@ def calculate_max_iterations(k, p):
     return math.factorial(k) ** (p - 1)
 
 # Example usage:
-k = 3 # Number of divisions per parameter
-p = 11  # Number of parameters
+k = 2 # Number of divisions per parameter
+p = 18  # Number of parameters
 N_max = calculate_max_iterations(k, p)
 print(f"Maximum number of iterations (N_max): {N_max}")
 
@@ -59,9 +61,9 @@ data = data.drop(['chain'], axis=1)
 data.columns = ['KGE_Runoff', 'MAE_SMB', 'KGE_SWE'] + list(data.columns[3:])
 data.columns = data.columns.str.replace('par', '')
 
-# data = data[data['KGE_Runoff'] > 0.5]
+data = data[data['KGE_Runoff'] > 0.5]
 data = data[data['MAE_SMB'] < 100]
-# data = data[data['KGE_SWE'] > 0.8]
+data = data[data['KGE_SWE'] > 0.8]
 # data = data.sort_values(by='KGE_Runoff', ascending=False)
 # perc = round(len(data)*0.01)
 # data = data.head(perc)
@@ -148,9 +150,10 @@ for col in data.columns[:]:
 table_df = pd.DataFrame(table_data, columns=['Parameter Name', 'Mean', 'Stdv'])
 print(table_df)
 
-table_df.to_csv(data_path + 'par_tab.csv', index=False)
+# table_df.to_csv(data_path + 'par_tab.csv', index=False)
 
 print([data['CFMAX_rel'].min(), data['CFMAX_rel'].max()])
+# print([data['KGE_Runoff'].min(), data['KGE_Runoff'].max()])
 
 ## Identify best run
 
